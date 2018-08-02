@@ -57,6 +57,9 @@ Quick example
         class Meta:
             collection = db.user
 
+    # Make sure that unique indexes are created
+    User.ensure_indexes()
+
     goku = User(email='goku@sayen.com', birthday=datetime(1984, 11, 20))
     goku.commit()
     vegeta = User(email='vegeta@over9000.com', friends=[goku])
