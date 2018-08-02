@@ -1,6 +1,5 @@
 from datetime import datetime
-from umongo import Document, EmbeddedDocument, Schema, EmbeddedSchema, fields, Reference
-from umongo.data_objects import List, Dict
+from umongo import Document, EmbeddedDocument, fields
 from umongo.query_mapper import map_query
 
 from .common import BaseTest

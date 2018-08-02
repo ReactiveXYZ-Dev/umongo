@@ -4,7 +4,7 @@ from bson import ObjectId
 from functools import wraps
 
 from ..common import BaseDBTest, get_pymongo_version, TEST_DB, con
-from ..fixtures import classroom_model, instance
+
 
 # Check if the required dependancies are met to run this driver's tests
 dep_error = None
@@ -34,8 +34,7 @@ except ImportError:
 else:
     pytest_inlineCallbacks = pytest.inlineCallbacks
 
-from umongo import (Document, EmbeddedDocument, fields, exceptions, Reference,
-                    Instance, TxMongoInstance, NoDBDefinedError)
+from umongo import Document, EmbeddedDocument, fields, exceptions, Reference
 
 
 if not dep_error:  # Make sure the module is valid by importing it

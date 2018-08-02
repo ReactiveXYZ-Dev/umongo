@@ -12,10 +12,8 @@ else:
     dep_error = None
 
 from ..common import BaseDBTest, TEST_DB
-from ..fixtures import classroom_model, instance
 
-from umongo import (Document, EmbeddedDocument, fields, exceptions, Reference,
-                    Instance, MotorAsyncIOInstance, NoDBDefinedError)
+from umongo import Document, EmbeddedDocument, fields, exceptions, Reference
 
 if not dep_error:  # Make sure the module is valid by importing it
     from umongo.frameworks import motor_asyncio as framework

@@ -4,10 +4,8 @@ from bson import ObjectId
 from pymongo import MongoClient
 
 from ..common import BaseDBTest, get_pymongo_version, TEST_DB
-from ..fixtures import classroom_model, instance
 
-from umongo import (Document, EmbeddedDocument, fields, exceptions, Reference,
-                    Instance, PyMongoInstance, NoDBDefinedError)
+from umongo import Document, EmbeddedDocument, fields, exceptions, Reference
 
 
 # Check if the required dependancies are met to run this driver's tests

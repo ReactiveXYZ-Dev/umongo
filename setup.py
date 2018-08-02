@@ -32,7 +32,7 @@ setup(
     install_requires=requirements,
     extras_require={
         'pymongo': ['pymongo>=3.2.1'],
-        'motor': ['motor>=1.1'],
+        'motor': ['motor>=1.1,<2.0'],
         'txmongo': ['txmongo>=16.0.1'],
         'mongomock': ['mongomock', 'pymongo']  # pymongo needed for bson module
     },
@@ -40,7 +40,6 @@ setup(
     zip_safe=False,
     keywords='umongo mongodb pymongo txmongo motor mongomock asyncio twisted',
     classifiers=[
-        'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',
         'Natural Language :: English',

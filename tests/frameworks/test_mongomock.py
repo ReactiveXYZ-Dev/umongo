@@ -2,7 +2,6 @@ import pytest
 from datetime import datetime
 
 from ..common import TEST_DB
-from ..fixtures import classroom_model, instance
 
 try:
     from mongomock import MongoClient

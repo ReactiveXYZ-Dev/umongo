@@ -9,8 +9,7 @@ from umongo.document import DocumentTemplate, DocumentImplementation
 from umongo.embedded_document import EmbeddedDocumentTemplate, EmbeddedDocumentImplementation
 from umongo.frameworks import MongoMockInstance, MotorAsyncIOInstance, TxMongoInstance, PyMongoInstance
 
-from .common import MockedDB, MockedBuilder, MockedInstance
-from .fixtures import instance
+from .common import MockedDB, MockedInstance
 
 
 # Try to retrieve framework's db to test against each of them

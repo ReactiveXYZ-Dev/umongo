@@ -130,10 +130,10 @@ def update_user(nick_or_id):
     if not user:
         abort(404)
     # Define a custom schema from the default one to ignore read-only fields
-    UserUpdateSchema = User.Schema.as_marshmallow_schema(params={
+    UserUpdateSchema = User.schema.as_marshmallow_schema(params={
         'password': {'dump_only': True},
         'nick': {'dump_only': True}
-    })()
+    })
     # with `strict`, marshmallow raise ValidationError if something is wrong
     schema = UserUpdateSchema(strict=True)
     try:
