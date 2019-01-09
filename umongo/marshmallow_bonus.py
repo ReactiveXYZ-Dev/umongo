@@ -149,6 +149,8 @@ class Reference(ObjectId):
             return str(value)
         else:
             # In OO world, value is a :class:`umongo.data_object.Reference`
+            if value.document is not None:
+                return value.document.dump()
             return str(value.pk)
 
 

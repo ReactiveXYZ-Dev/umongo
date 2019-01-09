@@ -44,14 +44,14 @@ class WrappedCursor(AsyncIOMotorCursor):
             return callback(result, error)
         return self.raw_cursor.each(wrapped_callback)
 
-    def to_list(self, length):
-        raw_future = self.raw_cursor.to_list(length)
+    def to_list(self, length=None, callback=None):
+        raw_future = self.raw_cursor.to_list(length, callback=callback)
         cooked_future = asyncio.Future()
         builder = self.document_cls.build_from_mongo
 
         def on_raw_done(fut):
             cooked_future.set_result([builder(e, use_cls=True) for e in fut.result()])
-
+            
         raw_future.add_done_callback(on_raw_done)
         return cooked_future
 
@@ -334,6 +334,15 @@ class MotorAsyncIOReference(Reference):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._document = None
+
+    def __getattr__(self, name):
+        if name in self.__dict__:
+            return self.name
+        return self._document[name]
+
+    @property
+    def document(self):
+        return self._document
 
     @asyncio.coroutine
     def fetch(self, no_data=False, force_reload=False):
