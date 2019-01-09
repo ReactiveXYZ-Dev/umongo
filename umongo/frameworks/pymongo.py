@@ -207,6 +207,17 @@ class PyMongoDocument(DocumentImplementation):
         return cls.cursor_cls(cls, raw_cursor)
 
     @classmethod
+    def count_documents(cls, filter=None, **kwargs):
+        """
+        Get the number of documents in this collection.
+
+        Unlike pymongo's collection.count_documents, filter is optional and
+        defaults to an empty filter.
+        """
+        filter = cook_find_filter(cls, filter or {})
+        return cls.collection.count_documents(filter, **kwargs)
+
+    @classmethod
     def ensure_indexes(cls):
         """
         Check&create if needed the Document's indexes in database

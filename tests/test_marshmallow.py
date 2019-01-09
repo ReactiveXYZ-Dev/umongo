@@ -75,6 +75,64 @@ class TestMarshmallow(BaseTest):
         assert not ret.errors
         assert ret.data == {'birthday': datetime(1990, 10, 23)}
 
+    def test_customize_nested_and_container_params(self):
+        @self.instance.register
+        class Accessory(EmbeddedDocument):
+            brief = fields.StrField(attribute='id', required=True)
+            value = fields.IntField()
+
+        @self.instance.register
+        class Bag(Document):
+            id = fields.EmbeddedField(Accessory, attribute='_id', required=True)
+            names = fields.ListField(fields.StringField())
+            content = fields.ListField(fields.EmbeddedField(Accessory))
+
+        ma_field = Bag.schema.fields['id'].as_marshmallow_field(params={
+            'load_only': True,
+            'params': {'value': {'dump_only': True}}})
+        assert ma_field.load_only is True
+        assert ma_field.nested._declared_fields['value'].dump_only
+        ma_field = Bag.schema.fields['names'].as_marshmallow_field(params={
+            'load_only': True,
+            'params': {'dump_only': True}})
+        assert ma_field.load_only is True
+        assert ma_field.container.dump_only is True
+        ma_field = Bag.schema.fields['content'].as_marshmallow_field(params={
+            'load_only': True,
+            'params': {'required': True, 'params': {'value': {'dump_only': True}}}})
+        assert ma_field.load_only is True
+        assert ma_field.container.required is True
+        assert ma_field.container.nested._declared_fields['value'].dump_only
+
+    def test_pass_meta_attributes(self):
+        @self.instance.register
+        class Accessory(EmbeddedDocument):
+            brief = fields.StrField(attribute='id', required=True)
+            value = fields.IntField()
+
+        @self.instance.register
+        class Bag(Document):
+            id = fields.EmbeddedField(Accessory, attribute='_id', required=True)
+            content = fields.ListField(fields.EmbeddedField(Accessory))
+
+        ma_schema = Bag.schema.as_marshmallow_schema(meta={'exclude': ('id',)})
+        assert ma_schema.Meta.exclude == ('id',)
+        ma_schema = Bag.schema.as_marshmallow_schema(params={
+            'id': {'meta': {'exclude': ('value',)}}})
+        assert ma_schema._declared_fields['id'].nested.Meta.exclude == ('value',)
+        ma_schema = Bag.schema.as_marshmallow_schema(params={
+            'content': {'params': {'meta': {'exclude': ('value',)}}}})
+        assert ma_schema._declared_fields['content'].container.nested.Meta.exclude == ('value',)
+
+        class DumpOnlyIdSchema(marshmallow.Schema):
+            class Meta:
+                dump_only = ('id',)
+
+        ma_custom_base_schema = Bag.schema.as_marshmallow_schema(
+            base_schema_cls=DumpOnlyIdSchema, meta={'exclude': ('content',)})
+        assert ma_custom_base_schema.Meta.exclude == ('content',)
+        assert ma_custom_base_schema.Meta.dump_only == ('id',)
+
     def test_keep_attributes(self):
         @self.instance.register
         class Vehicle(Document):
@@ -203,6 +261,33 @@ class TestMarshmallow(BaseTest):
         ret = ma_mongo_schema.load(data)
         assert not ret.errors
         assert ret.data == bag.to_mongo()
+
+        # Check as_marshmallow_schema params (check_unknown_felds, base_schema_cls)
+        # are passed to nested schemas
+        data = {
+            'id': {'brief': 'sportbag', 'value': 100, 'name': 'Unknown'},
+            'content': [
+                {'brief': 'cellphone', 'value': 500, 'name': 'Unknown'},
+                {'brief': 'lighter', 'value': 2, 'name': 'Unknown'}]
+        }
+        ret = ma_schema.load(data)
+        assert ret.errors == {
+            'id': {'_schema': ['Unknown field name name.']},
+            'content': {
+                0: {'_schema': ['Unknown field name name.']},
+                1: {'_schema': ['Unknown field name name.']},
+            }}
+
+        ma_no_check_unknown_schema = Bag.schema.as_marshmallow_schema(check_unknown_fields=False)()
+        ret = ma_no_check_unknown_schema.load(data)
+        assert not ret.errors
+
+        class WithNameSchema(marshmallow.Schema):
+            name = marshmallow.fields.Str()
+
+        ma_custom_base_schema = Bag.schema.as_marshmallow_schema(base_schema_cls=WithNameSchema)()
+        ret = ma_custom_base_schema.load(data)
+        assert not ret.errors
 
     def test_marshmallow_bonus_fields(self):
         # Fields related to mongodb provided for marshmallow

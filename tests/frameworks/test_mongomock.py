@@ -15,10 +15,13 @@ if not dep_error:  # Make sure the module is valid by importing it
     from umongo.frameworks import mongomock
 
 
-# Used by fixtures.py
+def make_db():
+    return MongoClient()[TEST_DB]
+
+
 @pytest.fixture
 def db():
-    return MongoClient()[TEST_DB]
+    return make_db()
 
 
 # MongoMockBuilder is 100% based on PyMongoBuilder so no need for really heavy tests

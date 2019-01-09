@@ -2,11 +2,18 @@
 History
 =======
 
-dev
----
-* Raise UnknownFieldInDBError when an unknown field is found in database
-  and not using BaseNonStrictDataProxy (see #121)
-* Fix (non fatal) crash in garbage collector when using WrappedCursor with mongomock
+1.0.0 (2018-11-29)
+------------------
+* Raise ``UnknownFieldInDBError`` when an unknown field is found in database
+  and not using ``BaseNonStrictDataProxy`` (see #121)
+* Fix (non fatal) crash in garbage collector when using ``WrappedCursor`` with
+  mongomock
+* Depend on pymongo 3.7+ (see #149)
+* Pass ``as_marshmallow_schema params`` to nested schemas. Since this change, every
+  field's ``as_marshmallow_schema`` method should expect unknown ``**kwargs`` (see #101).
+* Pass params to container field in ``ListField.as_marshmallow_schema`` (see #150)
+* Add ``meta`` kwarg to ``as_marshmallow_schema`` to pass a ``dict`` of attributes
+  for the schema's ``Meta`` class (see #151)
 
 0.15.0 (2017-08-15)
 -------------------
@@ -37,7 +44,7 @@ dev
 
 * Replace ``Document.opts.children`` by ``offspring`` and fix grand child
   inheritance issue (see #66)
-* Fix dependancy since release of motor 1.0 with breaking API
+* Fix dependency since release of motor 1.0 with breaking API
 
 0.11.0 (2016-11-02)
 -------------------

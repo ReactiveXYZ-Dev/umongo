@@ -31,7 +31,7 @@ class BaseSchema(MaSchema):
                 field.map_to_field(mongo_path, name, func)
 
     def as_marshmallow_schema(self, params=None, base_schema_cls=MaSchema,
-                              check_unknown_fields=True, mongo_world=False):
+                              check_unknown_fields=True, mongo_world=False, meta=None):
         """
         Return a pure-marshmallow version of this schema class.
 
@@ -41,10 +41,17 @@ class BaseSchema(MaSchema):
         :param check_unknown_fields: Unknown fields are considered as errors (default: True).
         :param mongo_world: If True the schema will work against the mongo world
             instead of the OO world (default: False).
+        :param meta: Optional dict with attributes for the schema's Meta class.
         """
         params = params or {}
-        nmspc = {name: field.as_marshmallow_field(params=params.get(name), mongo_world=mongo_world)
-                 for name, field in self.fields.items()}
+        nmspc = {
+            name: field.as_marshmallow_field(
+                params=params.get(name),
+                base_schema_cls=base_schema_cls,
+                check_unknown_fields=check_unknown_fields,
+                mongo_world=mongo_world)
+            for name, field in self.fields.items()
+        }
         name = 'Marshmallow%s' % type(self).__name__
         if check_unknown_fields:
             nmspc['_%s__check_unknown_fields' % name] = validates_schema(
@@ -53,6 +60,8 @@ class BaseSchema(MaSchema):
         # disable this behavior here to let marshmallow deals with it
         if not mongo_world:
             nmspc['get_attribute'] = schema_from_umongo_get_attribute
+        if meta:
+            nmspc['Meta'] = type('Meta', (base_schema_cls.Meta,), meta)
         return type(name, (base_schema_cls, ), nmspc)
 
 
@@ -185,7 +194,7 @@ class BaseField(ma_fields.Field):
         params.update(self.metadata)
         return params
 
-    def as_marshmallow_field(self, params=None, mongo_world=False):
+    def as_marshmallow_field(self, params=None, mongo_world=False, **kwargs):
         """
         Return a pure-marshmallow version of this field.
 
@@ -194,14 +203,14 @@ class BaseField(ma_fields.Field):
         :param mongo_world: If True the field will work against the mongo world
             instead of the OO world (default: False)
         """
-        kwargs = self._extract_marshmallow_field_params(mongo_world)
+        field_kwargs = self._extract_marshmallow_field_params(mongo_world)
         if params:
-            kwargs.update(params)
+            field_kwargs.update(params)
         # Retrieve the marshmallow class we inherit from
         for m_class in type(self).mro():
             if (not issubclass(m_class, BaseField) and
                     issubclass(m_class, ma_fields.Field)):
-                m_field = m_class(**kwargs)
+                m_field = m_class(**field_kwargs)
                 # Add i18n support to the field
                 m_field.error_messages = I18nErrorDict(m_field.error_messages)
                 return m_field

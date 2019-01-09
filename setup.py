@@ -16,12 +16,13 @@ with open('HISTORY.rst', 'rb') as history_file:
 
 requirements = [
     "marshmallow>=2.6.0",
-    "python-dateutil>=2.5.0"
+    "python-dateutil>=2.5.0",
+    "pymongo>=3.7.0",
 ]
 
 setup(
     name='umongo',
-    version='0.15.0',
+    version='1.0.0',
     description="sync/async MongoDB ODM, yes.",
     long_description=readme + '\n\n' + history,
     author="Emmanuel Leblond",
@@ -31,15 +32,15 @@ setup(
     include_package_data=True,
     install_requires=requirements,
     extras_require={
-        'pymongo': ['pymongo>=3.2.1'],
         'motor': ['motor>=1.1,<2.0'],
         'txmongo': ['txmongo>=16.0.1'],
-        'mongomock': ['mongomock', 'pymongo']  # pymongo needed for bson module
+        'mongomock': ['mongomock'],
     },
     license="MIT",
     zip_safe=False,
     keywords='umongo mongodb pymongo txmongo motor mongomock asyncio twisted',
     classifiers=[
+        'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',
         'Natural Language :: English',

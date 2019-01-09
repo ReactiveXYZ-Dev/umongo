@@ -20,7 +20,7 @@ for name, inst in (('mongomock', MongoMockInstance),
                    ('pymongo', PyMongoInstance)):
     mod = importlib.import_module('tests.frameworks.test_%s' % name)
     if not mod.dep_error:
-        DB_AND_INSTANCE_PER_FRAMEWORK.append((mod.db(), inst))
+        DB_AND_INSTANCE_PER_FRAMEWORK.append((mod.make_db(), inst))
 
 
 @pytest.fixture(params=DB_AND_INSTANCE_PER_FRAMEWORK)

@@ -75,12 +75,11 @@ Quick example
 
 Get it now::
 
-    $ pip install umongo
-    $ pip install my-mongo-driver  # Note you have to manually install the mongodb driver
+    $ pip install umongo           # This installs umongo with pymongo
+    $ pip install my-mongo-driver  # Other MongoDB drivers must be installed manually
 
 Or to get it along with the MongoDB driver you're planing to use::
 
-    $ pip install umongo[pymongo]   # choose
-    $ pip install umongo[motor]     # one
-    $ pip install umongo[txmongo]   # of
-    $ pip install umongo[mongomock] # them ;-)
+    $ pip install umongo[motor]
+    $ pip install umongo[txmongo]
+    $ pip install umongo[mongomock]

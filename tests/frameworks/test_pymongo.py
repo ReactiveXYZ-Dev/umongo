@@ -2,22 +2,23 @@ import pytest
 from datetime import datetime
 from bson import ObjectId
 from pymongo import MongoClient
+from pymongo.results import InsertOneResult, UpdateResult, DeleteResult
 
-from ..common import BaseDBTest, get_pymongo_version, TEST_DB
+from ..common import BaseDBTest, TEST_DB
 
 from umongo import Document, EmbeddedDocument, fields, exceptions, Reference
+from umongo.frameworks import pymongo as framework_pymongo
 
 
-# Check if the required dependancies are met to run this driver's tests
-major, minor, _ = get_pymongo_version()
-if int(major) != 3 or int(minor) < 2:
-    dep_error = "pymongo driver requires pymongo>=3.2.0"
-else:
-    dep_error = None
-    from pymongo.results import InsertOneResult, UpdateResult, DeleteResult
+# All dependencies here are mandatory
+dep_error = None
 
-if not dep_error:  # Make sure the module is valid by importing it
-    from umongo.frameworks import pymongo as framework_pymongo
+
+def _stripped(indexes):
+    # Version may differ between database versions and configurations so it shall not be checked
+    for idx in indexes:
+        idx.pop('v')
+    return indexes
 
 
 # Helper to sort indexes by name in order to have deterministic comparison
@@ -25,13 +26,15 @@ def name_sorted(indexes):
     return sorted(indexes, key=lambda x: x['name'])
 
 
-# Used by fixtures.py
-@pytest.fixture
-def db():
+def make_db():
     return MongoClient()[TEST_DB]
 
 
-@pytest.mark.skipif(dep_error is not None, reason=dep_error)
+@pytest.fixture
+def db():
+    return make_db()
+
+
 class TestPymongo(BaseDBTest):
 
     def test_create(self, classroom_model):
@@ -81,17 +84,17 @@ class TestPymongo(BaseDBTest):
         with pytest.raises(exceptions.NotCreatedError):
             john.delete()
         john.commit()
-        assert Student.collection.find().count() == 1
+        assert Student.count_documents() == 1
         ret = john.delete()
         assert isinstance(ret, DeleteResult)
         assert not john.is_created
-        assert Student.collection.find().count() == 0
+        assert Student.count_documents() == 0
         with pytest.raises(exceptions.NotCreatedError):
             john.delete()
         # Can re-commit the document in database
         john.commit()
         assert john.is_created
-        assert Student.collection.find().count() == 1
+        assert Student.count_documents() == 1
         # Test conditional delete
         with pytest.raises(exceptions.DeleteError):
             john.delete(conditions={'name': 'Bad Name'})
@@ -120,11 +123,10 @@ class TestPymongo(BaseDBTest):
         Student.collection.drop()
         for i in range(10):
             Student(name='student-%s' % i).commit()
-        cursor = Student.find(limit=5, skip=6)
-        assert cursor.count() == 10
-        assert cursor.count(with_limit_and_skip=True) == 4
+        assert Student.count_documents() == 10
+        assert Student.count_documents(limit=5, skip=6) == 4
         names = []
-        for elem in cursor:
+        for elem in Student.find(limit=5, skip=6):
             assert isinstance(elem, Student)
             names.append(elem.name)
         assert sorted(names) == ['student-%s' % i for i in range(6, 10)]
@@ -321,26 +323,25 @@ class TestPymongo(BaseDBTest):
 
         # Now ask for indexes building
         SimpleIndexDoc.ensure_indexes()
-        indexes = [e for e in SimpleIndexDoc.collection.list_indexes()]
+        indexes = list(SimpleIndexDoc.collection.list_indexes())
         expected_indexes = [
             {
                 'key': {'_id': 1},
                 'name': '_id_',
                 'ns': '%s.simple_index_doc' % TEST_DB,
-                'v': 1
             },
             {
-                'v': 1,
                 'key': {'indexed': 1},
                 'name': 'indexed_1',
                 'ns': '%s.simple_index_doc' % TEST_DB
             }
         ]
-        assert indexes == expected_indexes
+        assert _stripped(indexes) == expected_indexes
 
         # Redoing indexes building should do nothing
         SimpleIndexDoc.ensure_indexes()
-        assert indexes == expected_indexes
+        indexes = list(SimpleIndexDoc.collection.list_indexes())
+        assert _stripped(indexes) == expected_indexes
 
     def test_indexes_inheritance(self, instance):
 
@@ -356,26 +357,25 @@ class TestPymongo(BaseDBTest):
 
         # Now ask for indexes building
         SimpleIndexDoc.ensure_indexes()
-        indexes = [e for e in SimpleIndexDoc.collection.list_indexes()]
+        indexes = list(SimpleIndexDoc.collection.list_indexes())
         expected_indexes = [
             {
                 'key': {'_id': 1},
                 'name': '_id_',
                 'ns': '%s.simple_index_doc' % TEST_DB,
-                'v': 1
             },
             {
-                'v': 1,
                 'key': {'indexed': 1},
                 'name': 'indexed_1',
                 'ns': '%s.simple_index_doc' % TEST_DB
             }
         ]
-        assert indexes == expected_indexes
+        assert _stripped(indexes) == expected_indexes
 
         # Redoing indexes building should do nothing
         SimpleIndexDoc.ensure_indexes()
-        assert indexes == expected_indexes
+        indexes = list(SimpleIndexDoc.collection.list_indexes())
+        assert _stripped(indexes) == expected_indexes
 
     def test_unique_index(self, instance):
 
@@ -390,23 +390,20 @@ class TestPymongo(BaseDBTest):
 
         # Now ask for indexes building
         UniqueIndexDoc.ensure_indexes()
-        indexes = [e for e in UniqueIndexDoc.collection.list_indexes()]
+        indexes = list(UniqueIndexDoc.collection.list_indexes())
         expected_indexes = [
             {
                 'key': {'_id': 1},
                 'name': '_id_',
                 'ns': '%s.unique_index_doc' % TEST_DB,
-                'v': 1
             },
             {
-                'v': 1,
                 'key': {'required_unique': 1},
                 'name': 'required_unique_1',
                 'unique': True,
                 'ns': '%s.unique_index_doc' % TEST_DB
             },
             {
-                'v': 1,
                 'key': {'sparse_unique': 1},
                 'name': 'sparse_unique_1',
                 'unique': True,
@@ -414,12 +411,12 @@ class TestPymongo(BaseDBTest):
                 'ns': '%s.unique_index_doc' % TEST_DB
             },
         ]
-        assert name_sorted(indexes) == name_sorted(expected_indexes)
+        assert name_sorted(_stripped(indexes)) == name_sorted(expected_indexes)
 
         # Redoing indexes building should do nothing
         UniqueIndexDoc.ensure_indexes()
-        indexes = [e for e in UniqueIndexDoc.collection.list_indexes()]
-        assert name_sorted(indexes) == name_sorted(expected_indexes)
+        indexes = list(UniqueIndexDoc.collection.list_indexes())
+        assert name_sorted(_stripped(indexes)) == name_sorted(expected_indexes)
 
         UniqueIndexDoc(not_unique='a', required_unique=1).commit()
         UniqueIndexDoc(not_unique='a', sparse_unique=1, required_unique=2).commit()
@@ -447,28 +444,26 @@ class TestPymongo(BaseDBTest):
 
         # Now ask for indexes building
         UniqueIndexCompoundDoc.ensure_indexes()
-        indexes = [e for e in UniqueIndexCompoundDoc.collection.list_indexes()]
+        indexes = list(UniqueIndexCompoundDoc.collection.list_indexes())
         expected_indexes = [
             {
                 'key': {'_id': 1},
                 'name': '_id_',
                 'ns': '%s.unique_index_compound_doc' % TEST_DB,
-                'v': 1
             },
             {
-                'v': 1,
                 'key': {'compound1': 1, 'compound2': 1},
                 'name': 'compound1_1_compound2_1',
                 'unique': True,
                 'ns': '%s.unique_index_compound_doc' % TEST_DB
             }
         ]
-        assert name_sorted(indexes) == name_sorted(expected_indexes)
+        assert name_sorted(_stripped(indexes)) == name_sorted(expected_indexes)
 
         # Redoing indexes building should do nothing
         UniqueIndexCompoundDoc.ensure_indexes()
-        indexes = [e for e in UniqueIndexCompoundDoc.collection.list_indexes()]
-        assert name_sorted(indexes) == name_sorted(expected_indexes)
+        indexes = list(UniqueIndexCompoundDoc.collection.list_indexes())
+        assert name_sorted(_stripped(indexes)) == name_sorted(expected_indexes)
 
         # Index is on the tuple (compound1, compound2)
         UniqueIndexCompoundDoc(not_unique='a', compound1=1, compound2=1).commit()
@@ -512,48 +507,43 @@ class TestPymongo(BaseDBTest):
 
         # Now ask for indexes building
         UniqueIndexChildDoc.ensure_indexes()
-        indexes = [e for e in UniqueIndexChildDoc.collection.list_indexes()]
+        indexes = list(UniqueIndexChildDoc.collection.list_indexes())
         expected_indexes = [
             {
                 'key': {'_id': 1},
                 'name': '_id_',
                 'ns': '%s.unique_index_inheritance_doc' % TEST_DB,
-                'v': 1
             },
             {
-                'v': 1,
                 'key': {'unique': 1},
                 'name': 'unique_1',
                 'unique': True,
                 'ns': '%s.unique_index_inheritance_doc' % TEST_DB
             },
             {
-                'v': 1,
                 'key': {'manual_index': 1, '_cls': 1},
                 'name': 'manual_index_1__cls_1',
                 'ns': '%s.unique_index_inheritance_doc' % TEST_DB
             },
             {
-                'v': 1,
                 'key': {'_cls': 1},
                 'name': '_cls_1',
                 'unique': True,
                 'ns': '%s.unique_index_inheritance_doc' % TEST_DB
             },
             {
-                'v': 1,
                 'key': {'child_unique': 1, '_cls': 1},
                 'name': 'child_unique_1__cls_1',
                 'unique': True,
                 'ns': '%s.unique_index_inheritance_doc' % TEST_DB
             }
         ]
-        assert name_sorted(indexes) == name_sorted(expected_indexes)
+        assert name_sorted(_stripped(indexes)) == name_sorted(expected_indexes)
 
         # Redoing indexes building should do nothing
         UniqueIndexChildDoc.ensure_indexes()
-        indexes = [e for e in UniqueIndexChildDoc.collection.list_indexes()]
-        assert name_sorted(indexes) == name_sorted(expected_indexes)
+        indexes = list(UniqueIndexChildDoc.collection.list_indexes())
+        assert name_sorted(_stripped(indexes)) == name_sorted(expected_indexes)
 
     def test_inheritance_search(self, instance):
 
@@ -586,10 +576,10 @@ class TestPymongo(BaseDBTest):
         InheritanceSearchChild1Child(pf=1, sc1f=1).commit()
         InheritanceSearchChild2(pf=2, c2f=2).commit()
 
-        assert InheritanceSearchParent.find().count() == 4
-        assert InheritanceSearchChild1.find().count() == 2
-        assert InheritanceSearchChild1Child.find().count() == 1
-        assert InheritanceSearchChild2.find().count() == 1
+        assert InheritanceSearchParent.count_documents() == 4
+        assert InheritanceSearchChild1.count_documents() == 2
+        assert InheritanceSearchChild1Child.count_documents() == 1
+        assert InheritanceSearchChild2.count_documents() == 1
 
         res = InheritanceSearchParent.find_one({'sc1f': 1})
         assert isinstance(res, InheritanceSearchChild1Child)
@@ -640,10 +630,12 @@ class TestPymongo(BaseDBTest):
             {'name': 'Jon I'}
         ]).commit()
 
-        assert Book.find({'title': 'The Hobbit'}).count() == 1
-        assert Book.find({'author.name': {'$in': ['JK Rowling', 'JRR Tolkien']}}).count() == 2
-        assert Book.find({'$and': [{'chapters.name': 'Roast Mutton'}, {'title': 'The Hobbit'}]}).count() == 1
-        assert Book.find({'chapters.name': {'$all': ['Roast Mutton', 'A Short Rest']}}).count() == 1
+        assert Book.count_documents({'title': 'The Hobbit'}) == 1
+        assert Book.count_documents({'author.name': {'$in': ['JK Rowling', 'JRR Tolkien']}}) == 2
+        assert Book.count_documents(
+            {'$and': [{'chapters.name': 'Roast Mutton'}, {'title': 'The Hobbit'}]}) == 1
+        assert Book.count_documents(
+            {'chapters.name': {'$all': ['Roast Mutton', 'A Short Rest']}}) == 1
 
     def test_pre_post_hooks(self, instance):
 

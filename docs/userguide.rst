@@ -280,9 +280,9 @@ Now we can define & register documents, then work with them:
     False
     >>> DogInstance2Impl = instance2.register(Dog)
     >>> DogInstance1Impl().commit()
-    >>> DogInstance1Impl.find().count()
+    >>> DogInstance1Impl.count_documents()
     1
-    >>> DogInstance2Impl.find().count()
+    >>> DogInstance2Impl.count_documents()
     0
 
 .. note::
