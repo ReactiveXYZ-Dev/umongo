@@ -753,6 +753,11 @@ class TestMotorAsyncio(BaseDBTest):
             for r in (yield from cursor.to_list(length=100)):
                 assert isinstance(r, InheritanceSearchChild1)
 
+            isc = InheritanceSearchChild1(pf=2, c1f=2)
+            yield from isc.commit()
+            res = yield from InheritanceSearchChild1.find_one(isc.id)
+            assert res == isc
+
         loop.run_until_complete(do_test())
 
     def test_search(self, loop, instance):

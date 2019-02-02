@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 from bson import DBRef
 
 from marshmallow import pre_load, post_load, pre_dump, post_dump, validates_schema  # republishing
@@ -140,7 +142,7 @@ class DocumentImplementation(BaseDataObject, Implementation, metaclass=MetaDocum
             raise AbstractDocumentError("Cannot instantiate an abstract Document")
         self.is_created = False
         "Return True if the document has been commited to database"  # is_created's docstring
-        self._data = self.DataProxy(kwargs if kwargs else None)
+        self._data = self.DataProxy(kwargs)
 
     def __repr__(self):
         return '<object Document %s.%s(%s)>' % (
@@ -157,6 +159,19 @@ class DocumentImplementation(BaseDataObject, Implementation, metaclass=MetaDocum
         elif isinstance(other, Reference):
             return isinstance(self, other.document_cls) and self.pk == other.pk
         return NotImplemented
+
+    def clone(self):
+        """Return a copy of this Document as a new Document instance
+
+        All fields are deep-copied except the _id field.
+        """
+        new = self.__class__()
+        data = deepcopy(self._data._data)
+        # Replace ID with new ID ("missing" unless a default value is provided)
+        data['_id'] = new._data._data['_id']
+        new._data._data = data
+        new._data._modified_data = set(data.keys())
+        return new
 
     @property
     def collection(self):
@@ -281,6 +296,8 @@ class DocumentImplementation(BaseDataObject, Implementation, metaclass=MetaDocum
             self._data.set(name, value, to_raise=AttributeError)
 
     def __getattr__(self, name):
+        if name[:2] == name[-2:] == '__':
+            raise AttributeError(name)
         value = self._data.get(name, to_raise=AttributeError)
         return value if value is not missing else None
 

@@ -588,6 +588,11 @@ class TestPymongo(BaseDBTest):
         for r in res:
             assert isinstance(r, InheritanceSearchChild1)
 
+        isc = InheritanceSearchChild1(pf=2, c1f=2)
+        isc.commit()
+        res = InheritanceSearchChild1.find_one(isc.id)
+        assert res == isc
+
     def test_search(self, instance):
 
         @instance.register

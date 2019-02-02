@@ -2,6 +2,14 @@
 History
 =======
 
+1.1.0 (2019-01-14)
+------------------
+
+* Fix bug when filtering by id in a Document subclass find query (see #145).
+* Fix __getattr__ to allow copying and deepcopying Document and EmbeddedDocument
+  (see #157).
+* Add Document.clone() method (see #158).
+
 1.0.0 (2018-11-29)
 ------------------
 * Raise ``UnknownFieldInDBError`` when an unknown field is found in database

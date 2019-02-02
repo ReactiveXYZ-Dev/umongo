@@ -1,3 +1,5 @@
+from copy import copy, deepcopy
+
 import pytest
 from marshmallow import ValidationError, missing
 
@@ -396,3 +398,23 @@ class TestEmbeddedDocument(BaseTest):
         with pytest.raises(exceptions.ValidationError) as exc:
             NonStrictEmbeddedDoc(a=42, b='foo')
         assert exc.value.messages == {'_schema': ['Unknown field name b.']}
+
+    def test_deepcopy(self):
+
+        @self.instance.register
+        class Child(EmbeddedDocument):
+            name = fields.StrField()
+
+        @self.instance.register
+        class Parent(EmbeddedDocument):
+            name = fields.StrField()
+            child = fields.EmbeddedField(Child)
+
+        john = Parent(name='John Doe', child={'name': 'John Doe Jr.'})
+        jane = copy(john)
+        assert jane.name == john.name
+        assert jane.child is john.child
+        jane = deepcopy(john)
+        assert jane.name == john.name
+        assert jane.child == john.child
+        assert jane.child is not john.child

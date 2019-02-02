@@ -15,14 +15,14 @@ with open('HISTORY.rst', 'rb') as history_file:
     history = history_file.read().decode('utf8')
 
 requirements = [
-    "marshmallow>=2.6.0",
+    "marshmallow>=2.18.0,<3.0.0",
     "python-dateutil>=2.5.0",
     "pymongo>=3.7.0",
 ]
 
 setup(
     name='umongo',
-    version='1.0.0',
+    version='1.1.0',
     description="sync/async MongoDB ODM, yes.",
     long_description=readme + '\n\n' + history,
     author="Emmanuel Leblond",

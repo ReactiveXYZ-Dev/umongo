@@ -1,3 +1,5 @@
+from copy import copy, deepcopy
+
 import pytest
 from datetime import datetime
 from bson import ObjectId, DBRef
@@ -354,6 +356,66 @@ class TestDocument(BaseTest):
 
         with pytest.raises(NotImplementedError):
             Doc()
+
+    def test_deepcopy(self):
+
+        @self.instance.register
+        class Child(EmbeddedDocument):
+            name = fields.StrField()
+
+        @self.instance.register
+        class Parent(Document):
+            name = fields.StrField()
+            child = fields.EmbeddedField(Child)
+
+        john = Parent(name='John Doe', child={'name': 'John Doe Jr.'})
+        jane = copy(john)
+        assert jane.name == john.name
+        assert jane.child is john.child
+        jane = deepcopy(john)
+        assert jane.name == john.name
+        assert jane.child == john.child
+        assert jane.child is not john.child
+
+    def test_clone(self):
+
+        @self.instance.register
+        class Child(EmbeddedDocument):
+            name = fields.StrField()
+
+        @self.instance.register
+        class Parent(Document):
+            name = fields.StrField()
+            birthday = fields.DateTimeField(dump_only=True)
+            child = fields.EmbeddedField(Child)
+
+        john = Parent(name='John Doe', child={'name': 'John Jr.'})
+        john.birthday = datetime(1995, 12, 12)
+        john.id = ObjectId("5672d47b1d41c88dcd37ef05")
+        jane = john.clone()
+        assert isinstance(jane, Parent)
+        assert isinstance(jane.child, Child)
+        assert jane.id is None
+        assert jane.birthday == datetime(1995, 12, 12)
+        assert jane.name == 'John Doe'
+        assert jane.child == john.child
+        assert jane.child is not john.child
+
+    def test_clone_default_id(self):
+        """Check clone gets a new default id if defaut is provided"""
+
+        @self.instance.register
+        class Parent(Document):
+            id = fields.ObjectIdField(attribute='_id', missing=ObjectId)
+            name = fields.StrField()
+
+        john = Parent(name='John Doe')
+        jane = john.clone()
+        assert isinstance(jane, Parent)
+        assert isinstance(john.id, ObjectId)
+        assert isinstance(jane.id, ObjectId)
+        assert jane.id != john.id
+        assert jane.name == 'John Doe'
 
 
 class TestConfig(BaseTest):

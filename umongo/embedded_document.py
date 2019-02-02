@@ -180,6 +180,8 @@ class EmbeddedDocumentImplementation(Implementation, BaseDataObject):
             self._data.set(name, value, to_raise=AttributeError)
 
     def __getattr__(self, name):
+        if name[:2] == name[-2:] == '__':
+            raise AttributeError(name)
         value = self._data.get(name, to_raise=AttributeError)
         return value if value is not missing else None
 

@@ -9,6 +9,9 @@ def cook_find_filter(doc_cls, filter):
     filter = map_query(filter, doc_cls.schema.fields)
     if doc_cls.opts.is_child:
         filter = filter or {}
+        # Filter should be either a dict or an id
+        if not isinstance(filter, dict):
+            filter = {'_id': filter}
         # Current document shares the collection with a parent,
         # we must use the _cls field to discriminate
         if doc_cls.opts.offspring:
