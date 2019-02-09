@@ -2,7 +2,7 @@ from datetime import datetime
 
 from marshmallow import ValidationError, missing
 from marshmallow import fields as ma_fields
-from bson import DBRef, ObjectId
+from bson import DBRef, ObjectId, Decimal128
 
 # from .registerer import retrieve_document
 from .exceptions import NotRegisteredDocumentError
@@ -152,7 +152,17 @@ class IntegerField(BaseField, ma_fields.Integer):
 
 
 class DecimalField(BaseField, ma_fields.Decimal):
-    pass
+    """
+    .. warning::
+
+        This field is only supported on MongoDB 3.4+.
+        Using it on older versions will result in uncaught errors.
+    """
+    def _serialize_to_mongo(self, obj):
+        return Decimal128(obj)
+
+    def _deserialize_from_mongo(self, value):
+        return value.to_decimal()
 
 
 class BooleanField(BaseField, ma_fields.Boolean):

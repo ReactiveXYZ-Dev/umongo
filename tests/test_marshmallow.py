@@ -133,6 +133,35 @@ class TestMarshmallow(BaseTest):
         assert ma_custom_base_schema.Meta.exclude == ('content',)
         assert ma_custom_base_schema.Meta.dump_only == ('id',)
 
+    def test_as_marshmallow_schema_cache(self):
+        ma_schema_cls = self.User.schema.as_marshmallow_schema()
+
+        new_ma_schema_cls = self.User.schema.as_marshmallow_schema(
+            params={'name': {'load_only': True}})
+        assert new_ma_schema_cls != ma_schema_cls
+
+        new_ma_schema_cls = self.User.schema.as_marshmallow_schema(
+            meta={'exclude': ('name',)})
+        assert new_ma_schema_cls != ma_schema_cls
+
+        new_ma_schema_cls = self.User.schema.as_marshmallow_schema(
+            check_unknown_fields=False)
+        assert new_ma_schema_cls != ma_schema_cls
+
+        new_ma_schema_cls = self.User.schema.as_marshmallow_schema(
+            mongo_world=True)
+        assert new_ma_schema_cls != ma_schema_cls
+
+        class MyBaseSchema(marshmallow.Schema):
+            pass
+
+        new_ma_schema_cls = self.User.schema.as_marshmallow_schema(
+            base_schema_cls=MyBaseSchema)
+        assert new_ma_schema_cls != ma_schema_cls
+
+        new_ma_schema_cls = self.User.schema.as_marshmallow_schema()
+        assert new_ma_schema_cls == ma_schema_cls
+
     def test_keep_attributes(self):
         @self.instance.register
         class Vehicle(Document):

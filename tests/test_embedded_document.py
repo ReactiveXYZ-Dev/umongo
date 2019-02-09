@@ -245,6 +245,9 @@ class TestEmbeddedDocument(BaseTest):
         assert doc.parent.to_mongo() == {'d': 2, '_cls': 'GrandChild'}
 
     def test_abstract_inheritance(self):
+        class AlienClass:
+            pass
+
         @self.instance.register
         class AbstractParent(EmbeddedDocument):
             a = fields.IntField(attribute='in_mongo_a_parent')
@@ -262,7 +265,7 @@ class TestEmbeddedDocument(BaseTest):
                 abstract = True
 
         @self.instance.register
-        class ConcreteChild(AbstractParent):
+        class ConcreteChild(AbstractParent, AlienClass):
             c = fields.IntField()
 
             class Meta:

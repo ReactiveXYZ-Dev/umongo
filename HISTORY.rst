@@ -2,6 +2,12 @@
 History
 =======
 
+1.2.0 (2019-02-08)
+------------------
+
+* Add ``Schema`` cache to ``as_marshmallow_schema`` (see #165).
+* Add ``DecimalField``. This field only works on MongoDB 3.4+. (see #162)
+
 1.1.0 (2019-01-14)
 ------------------
 

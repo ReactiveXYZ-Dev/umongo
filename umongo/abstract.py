@@ -17,6 +17,8 @@ class BaseSchema(MaSchema):
     __check_unknown_fields = validates_schema(pass_original=True)(
         schema_validator_check_unknown_fields)
 
+    _marshmallow_schemas_cache = {}
+
     def map_to_field(self, func):
         """
         Apply a function to every field in the schema
@@ -44,6 +46,13 @@ class BaseSchema(MaSchema):
         :param meta: Optional dict with attributes for the schema's Meta class.
         """
         params = params or {}
+        # Use hashable parameters as cache dict key and dict parameters for manual comparison
+        cache_key = (self.__class__, base_schema_cls, check_unknown_fields, mongo_world)
+        cache_modifiers = (params, meta)
+        if cache_key in self._marshmallow_schemas_cache:
+            for modifiers, ma_schema in self._marshmallow_schemas_cache[cache_key]:
+                if modifiers == cache_modifiers:
+                    return ma_schema
         nmspc = {
             name: field.as_marshmallow_field(
                 params=params.get(name),
@@ -57,12 +66,15 @@ class BaseSchema(MaSchema):
             nmspc['_%s__check_unknown_fields' % name] = validates_schema(
                 pass_original=True)(schema_validator_check_unknown_fields)
         # By default OO world returns `missing` fields as `None`,
-        # disable this behavior here to let marshmallow deals with it
+        # disable this behavior here to let marshmallow deal with it
         if not mongo_world:
             nmspc['get_attribute'] = schema_from_umongo_get_attribute
         if meta:
             nmspc['Meta'] = type('Meta', (base_schema_cls.Meta,), meta)
-        return type(name, (base_schema_cls, ), nmspc)
+        ma_schema = type(name, (base_schema_cls, ), nmspc)
+        self._marshmallow_schemas_cache.setdefault(cache_key, []).append(
+            (cache_modifiers, ma_schema))
+        return ma_schema
 
 
 class I18nErrorDict(dict):

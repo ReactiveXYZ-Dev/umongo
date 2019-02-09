@@ -435,6 +435,28 @@ class TestDataProxy(BaseTest):
         with pytest.raises(exceptions.UnknownFieldInDBError):
             d.from_mongo({'mongo_field': 42, 'xxx': 'foo'})
 
+    def test_iterators(self):
+        class MySchema(EmbeddedSchema):
+            field_a = fields.IntField(attribute='mongo_field_a')
+            field_b = fields.IntField(attribute='mongo_field_b')
+
+        DataProxy = data_proxy_factory('My', MySchema())
+        d = DataProxy()
+        d.from_mongo({'mongo_field_a': 42, 'mongo_field_b': 24})
+
+        assert set(d.keys()) == {'mongo_field_a', 'mongo_field_b'}
+        assert set(d.keys_by_mongo_name()) == {'mongo_field_a', 'mongo_field_b'}
+        assert set(d.values()) == {42, 24}
+        assert set(d.items()) == {('field_a', 42), ('field_b', 24)}
+        assert set(d.items_by_mongo_name()) == {('mongo_field_a', 42), ('mongo_field_b', 24)}
+
+        d.load({'field_a': 100, 'field_b': 200})
+        assert set(d.keys()) == {'mongo_field_a', 'mongo_field_b'}
+        assert set(d.keys_by_mongo_name()) == {'mongo_field_a', 'mongo_field_b'}
+        assert set(d.values()) == {100, 200}
+        assert set(d.items()) == {('field_a', 100), ('field_b', 200)}
+        assert set(d.items_by_mongo_name()) == {('mongo_field_a', 100), ('mongo_field_b', 200)}
+
 
 class TestNonStrictDataProxy(BaseTest):
 
