@@ -1,5 +1,6 @@
-import pytest
 from datetime import datetime
+
+import pytest
 
 from ..common import TEST_DB
 
@@ -12,7 +13,7 @@ else:
 
 
 if not dep_error:  # Make sure the module is valid by importing it
-    from umongo.frameworks import mongomock
+    from umongo.frameworks import mongomock  # noqa
 
 
 def make_db():

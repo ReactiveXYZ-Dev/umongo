@@ -21,7 +21,7 @@ Displaying a user:
     Content-Length: 145
     Content-Type: application/json
     Date: Mon, 02 May 2016 10:07:35 GMT
-    Server: Werkzeug/0.11.5 Python/3.4.3
+    Server: Werkzeug/0.14.1 Python/3.5.3
 
     {
         "birthday": "1953-06-15T00:00:00+00:00", 
@@ -40,7 +40,7 @@ Bad payload while trying to create user:
     Content-Length: 132
     Content-Type: application/json
     Date: Mon, 02 May 2016 10:06:12 GMT
-    Server: Werkzeug/0.11.5 Python/3.4.3
+    Server: Werkzeug/0.14.1 Python/3.5.3
 
     {
         "message": {
@@ -62,7 +62,7 @@ Same thing but with a ``accept-language`` header to specify French as prefered l
     Content-Length: 130
     Content-Type: application/json
     Date: Mon, 02 May 2016 10:05:20 GMT
-    Server: Werkzeug/0.11.5 Python/3.4.3
+    Server: Werkzeug/0.14.1 Python/3.5.3
 
     {
         "message": {

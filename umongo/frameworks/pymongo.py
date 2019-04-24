@@ -244,7 +244,7 @@ def _run_validators(validators, field, value):
 def _io_validate_data_proxy(schema, data_proxy, partial=None):
     errors = {}
     for name, field in schema.fields.items():
-        if partial and (partial is True or name not in partial):
+        if partial and name not in partial:
             continue
         data_name = field.attribute or name
         value = data_proxy._data[data_name]

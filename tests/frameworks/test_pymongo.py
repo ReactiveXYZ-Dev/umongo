@@ -1,13 +1,15 @@
-import pytest
 from datetime import datetime
+
+import pytest
+
 from bson import ObjectId
 from pymongo import MongoClient
 from pymongo.results import InsertOneResult, UpdateResult, DeleteResult
 
-from ..common import BaseDBTest, TEST_DB
-
 from umongo import Document, EmbeddedDocument, fields, exceptions, Reference
-from umongo.frameworks import pymongo as framework_pymongo
+from umongo.frameworks import pymongo as framework_pymongo  # noqa
+
+from ..common import BaseDBTest, TEST_DB
 
 
 # All dependencies here are mandatory
@@ -154,6 +156,8 @@ class TestPymongo(BaseDBTest):
         teacher.commit()
         course = classroom_model.Course(name='Hoverboard 101', teacher=teacher)
         course.commit()
+        assert student.courses is None
+        student.courses = []
         assert student.courses == []
         student.courses.append(course)
         student.commit()
@@ -254,7 +258,8 @@ class TestPymongo(BaseDBTest):
         class IOStudent(Student):
             io_field = fields.StrField(io_validate=io_validate)
             list_io_field = fields.ListField(fields.IntField(io_validate=io_validate))
-            reference_io_field = fields.ReferenceField(classroom_model.Course, io_validate=io_validate)
+            reference_io_field = fields.ReferenceField(
+                classroom_model.Course, io_validate=io_validate)
             embedded_io_field = fields.EmbeddedField(EmbeddedDoc, io_validate=io_validate)
 
         bad_reference = ObjectId()
@@ -610,30 +615,39 @@ class TestPymongo(BaseDBTest):
             chapters = fields.ListField(fields.EmbeddedField(Chapter), attribute='c')
 
         Book.collection.drop()
-        Book(title='The Hobbit', author={'name': 'JRR Tolkien'}, chapters=[
-            {'name': 'An Unexpected Party'},
-            {'name': 'Roast Mutton'},
-            {'name': 'A Short Rest'},
-            {'name': 'Over Hill And Under Hill'},
-            {'name': 'Riddles In The Dark'}
-        ]).commit()
-        Book(title="Harry Potter and the Philosopher's Stone",
-             author={'name': 'JK Rowling'},
-             chapters=[
+        Book(
+            title='The Hobbit', author={'name': 'JRR Tolkien'},
+            chapters=[
+                {'name': 'An Unexpected Party'},
+                {'name': 'Roast Mutton'},
+                {'name': 'A Short Rest'},
+                {'name': 'Over Hill And Under Hill'},
+                {'name': 'Riddles In The Dark'}
+            ]
+        ).commit()
+        Book(
+            title="Harry Potter and the Philosopher's Stone",
+            author={'name': 'JK Rowling'},
+            chapters=[
                 {'name': 'The Boy Who Lived'},
                 {'name': 'The Vanishing Glass'},
                 {'name': 'The Letters from No One'},
                 {'name': 'The Keeper of the Keys'},
                 {'name': 'Diagon Alley'}
-        ]).commit()
-        Book(title='A Game of Thrones', author={'name': 'George RR Martin'}, chapters=[
-            {'name': 'Prologue'},
-            {'name': 'Bran I'},
-            {'name': 'Catelyn I'},
-            {'name': 'Daenerys I'},
-            {'name': 'Eddard I'},
-            {'name': 'Jon I'}
-        ]).commit()
+            ]
+        ).commit()
+        Book(
+            title='A Game of Thrones',
+            author={'name': 'George RR Martin'},
+            chapters=[
+                {'name': 'Prologue'},
+                {'name': 'Bran I'},
+                {'name': 'Catelyn I'},
+                {'name': 'Daenerys I'},
+                {'name': 'Eddard I'},
+                {'name': 'Jon I'}
+            ]
+        ).commit()
 
         assert Book.count_documents({'title': 'The Hobbit'}) == 1
         assert Book.count_documents({'author.name': {'$in': ['JK Rowling', 'JRR Tolkien']}}) == 2

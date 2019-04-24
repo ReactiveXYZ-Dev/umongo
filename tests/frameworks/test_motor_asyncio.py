@@ -1,6 +1,8 @@
-import pytest
 import asyncio
 from datetime import datetime
+
+import pytest
+
 from bson import ObjectId
 
 # Check if the required dependancies are met to run this driver's tests
@@ -16,7 +18,7 @@ from ..common import BaseDBTest, TEST_DB
 from umongo import Document, EmbeddedDocument, fields, exceptions, Reference
 
 if not dep_error:  # Make sure the module is valid by importing it
-    from umongo.frameworks import motor_asyncio as framework
+    from umongo.frameworks import motor_asyncio as framework  # noqa
     from pymongo.results import InsertOneResult, UpdateResult, DeleteResult
 
 
@@ -29,6 +31,11 @@ def _stripped(indexes):
         k: {sk: sv for sk, sv in v.items() if sk not in ('ns', 'v')}
         for k, v in indexes.items()
     }
+
+
+# Helper to sort indexes by name in order to have deterministic comparison
+def name_sorted(indexes):
+    return sorted(indexes, key=lambda x: x['name'])
 
 
 def make_db():
@@ -51,10 +58,9 @@ class TestMotorAsyncio(BaseDBTest):
     def test_create(self, loop, classroom_model):
         Student = classroom_model.Student
 
-        @asyncio.coroutine
-        def do_test():
+        async def do_test():
             john = Student(name='John Doe', birthday=datetime(1995, 12, 12))
-            ret = yield from john.commit()
+            ret = await john.commit()
             assert isinstance(ret, InsertOneResult)
             assert john.to_mongo() == {
                 '_id': john.id,
@@ -62,10 +68,10 @@ class TestMotorAsyncio(BaseDBTest):
                 'birthday': datetime(1995, 12, 12)
             }
 
-            john2 = yield from Student.find_one(john.id)
+            john2 = await Student.find_one(john.id)
             assert john2._data == john._data
             # Double commit should do nothing
-            ret = yield from john.commit()
+            ret = await john.commit()
             assert ret is None
 
         loop.run_until_complete(do_test())
@@ -73,80 +79,77 @@ class TestMotorAsyncio(BaseDBTest):
     def test_update(self, loop, classroom_model):
         Student = classroom_model.Student
 
-        @asyncio.coroutine
-        def do_test():
+        async def do_test():
             john = Student(name='John Doe', birthday=datetime(1995, 12, 12))
-            yield from john.commit()
+            await john.commit()
             john.name = 'William Doe'
             assert john.to_mongo(update=True) == {'$set': {'name': 'William Doe'}}
-            ret = yield from john.commit()
+            ret = await john.commit()
             assert isinstance(ret, UpdateResult)
             assert john.to_mongo(update=True) is None
-            john2 = yield from Student.find_one(john.id)
+            john2 = await Student.find_one(john.id)
             assert john2._data == john._data
             # Update without changing anything
             john.name = john.name
-            yield from john.commit()
+            await john.commit()
             # Test conditional commit
             john.name = 'Zorro Doe'
             with pytest.raises(exceptions.UpdateError):
-                yield from john.commit(conditions={'name': 'Bad Name'})
-            yield from john.commit(conditions={'name': 'William Doe'})
-            yield from john.reload()
+                await john.commit(conditions={'name': 'Bad Name'})
+            await john.commit(conditions={'name': 'William Doe'})
+            await john.reload()
             assert john.name == 'Zorro Doe'
             # Cannot use conditions when creating document
             with pytest.raises(RuntimeError):
-                yield from Student(name='Joe').commit(conditions={'name': 'dummy'})
+                await Student(name='Joe').commit(conditions={'name': 'dummy'})
 
         loop.run_until_complete(do_test())
 
     def test_remove(self, loop, classroom_model):
         Student = classroom_model.Student
 
-        @asyncio.coroutine
-        def do_test():
-            yield from Student.collection.drop()
+        async def do_test():
+            await Student.collection.drop()
             john = Student(name='John Doe', birthday=datetime(1995, 12, 12))
             with pytest.raises(exceptions.NotCreatedError):
-                yield from john.remove()
-            yield from john.commit()
-            assert (yield from Student.find().count()) == 1
-            ret = yield from john.remove()
+                await john.remove()
+            await john.commit()
+            assert (await Student.find().count()) == 1
+            ret = await john.remove()
             assert isinstance(ret, DeleteResult)
             assert not john.is_created
-            assert (yield from Student.find().count()) == 0
+            assert (await Student.find().count()) == 0
             with pytest.raises(exceptions.NotCreatedError):
-                yield from john.remove()
+                await john.remove()
             # Can re-commit the document in database
-            yield from john.commit()
+            await john.commit()
             assert john.is_created
-            assert (yield from Student.find().count()) == 1
+            assert (await Student.find().count()) == 1
             # Test conditional delete
             with pytest.raises(exceptions.DeleteError):
-                yield from john.remove(conditions={'name': 'Bad Name'})
-            yield from john.remove(conditions={'name': 'John Doe'})
+                await john.remove(conditions={'name': 'Bad Name'})
+            await john.remove(conditions={'name': 'John Doe'})
             # Finally try to remove a doc no longer in database
-            yield from john.commit()
-            yield from (yield from Student.find_one(john.id)).remove()
+            await john.commit()
+            await (await Student.find_one(john.id)).remove()
             with pytest.raises(exceptions.DeleteError):
-                yield from john.remove()
+                await john.remove()
 
         loop.run_until_complete(do_test())
 
     def test_reload(self, loop, classroom_model):
         Student = classroom_model.Student
 
-        @asyncio.coroutine
-        def do_test():
-            yield from Student(name='Other dude').commit()
+        async def do_test():
+            await Student(name='Other dude').commit()
             john = Student(name='John Doe', birthday=datetime(1995, 12, 12))
             with pytest.raises(exceptions.NotCreatedError):
-                yield from john.reload()
-            yield from john.commit()
-            john2 = yield from Student.find_one(john.id)
+                await john.reload()
+            await john.commit()
+            john2 = await Student.find_one(john.id)
             john2.name = 'William Doe'
-            yield from john2.commit()
-            yield from john.reload()
+            await john2.commit()
+            await john.reload()
             assert john.name == 'William Doe'
 
         loop.run_until_complete(do_test())
@@ -154,21 +157,20 @@ class TestMotorAsyncio(BaseDBTest):
     def test_cursor(self, loop, classroom_model):
         Student = classroom_model.Student
 
-        @asyncio.coroutine
-        def do_test():
-            yield from Student.collection.drop()
+        async def do_test():
+            await Student.collection.drop()
 
             for i in range(10):
-                yield from Student(name='student-%s' % i).commit()
+                await Student(name='student-%s' % i).commit()
             cursor = Student.find(limit=5, skip=6)
-            count = yield from cursor.count()
+            count = await cursor.count()
             assert count == 10
-            count_with_limit_and_skip = yield from cursor.count(with_limit_and_skip=True)
+            count_with_limit_and_skip = await cursor.count(with_limit_and_skip=True)
             assert count_with_limit_and_skip == 4
 
             # Make sure returned documents are wrapped
             names = []
-            for elem in (yield from cursor.to_list(length=100)):
+            for elem in (await cursor.to_list(length=100)):
                 assert isinstance(elem, Student)
                 names.append(elem.name)
             assert sorted(names) == ['student-%s' % i for i in range(6, 10)]
@@ -176,7 +178,7 @@ class TestMotorAsyncio(BaseDBTest):
             # Try with fetch_next as well
             names = []
             cursor.rewind()
-            while (yield from cursor.fetch_next):
+            while (await cursor.fetch_next):
                 elem = cursor.next_object()
                 assert isinstance(elem, Student)
                 names.append(elem.name)
@@ -197,7 +199,7 @@ class TestMotorAsyncio(BaseDBTest):
                     names.append(result.name)
 
             cursor.each(callback=callback)
-            yield from future
+            await future
             assert sorted(names) == ['student-%s' % i for i in range(6, 10)]
 
             # Make sure this kind of notation doesn't create new cursor
@@ -209,8 +211,8 @@ class TestMotorAsyncio(BaseDBTest):
             # Test clone&rewind as well
             cursor = Student.find()
             cursor2 = cursor.clone()
-            yield from cursor.fetch_next
-            yield from cursor2.fetch_next
+            await cursor.fetch_next
+            await cursor2.fetch_next
             cursor_student = cursor.next_object()
             cursor2_student = cursor2.next_object()
             assert cursor_student == cursor2_student
@@ -219,18 +221,19 @@ class TestMotorAsyncio(BaseDBTest):
 
     def test_classroom(self, loop, classroom_model):
 
-        @asyncio.coroutine
-        def do_test():
+        async def do_test():
 
             student = classroom_model.Student(name='Marty McFly', birthday=datetime(1968, 6, 9))
-            yield from student.commit()
+            await student.commit()
             teacher = classroom_model.Teacher(name='M. Strickland')
-            yield from teacher.commit()
+            await teacher.commit()
             course = classroom_model.Course(name='Hoverboard 101', teacher=teacher)
-            yield from course.commit()
+            await course.commit()
+            assert student.courses is None
+            student.courses = []
             assert student.courses == []
             student.courses.append(course)
-            yield from student.commit()
+            await student.commit()
             assert student.to_mongo() == {
                 '_id': student.pk,
                 'name': 'Marty McFly',
@@ -242,10 +245,9 @@ class TestMotorAsyncio(BaseDBTest):
 
     def test_validation_on_commit(self, loop, instance):
 
-        @asyncio.coroutine
-        def do_test():
+        async def do_test():
 
-            def io_validate(field, value):
+            async def io_validate(field, value):
                 raise exceptions.ValidationError('Ho boys !')
 
             @instance.register
@@ -254,75 +256,73 @@ class TestMotorAsyncio(BaseDBTest):
                 always_io_fail = fields.IntField(io_validate=io_validate)
 
             with pytest.raises(exceptions.ValidationError) as exc:
-                yield from Dummy().commit()
+                await Dummy().commit()
             assert exc.value.messages == {'required_name': ['Missing data for required field.']}
             with pytest.raises(exceptions.ValidationError) as exc:
-                yield from Dummy(required_name='required', always_io_fail=42).commit()
+                await Dummy(required_name='required', always_io_fail=42).commit()
             assert exc.value.messages == {'always_io_fail': ['Ho boys !']}
 
             dummy = Dummy(required_name='required')
-            yield from dummy.commit()
+            await dummy.commit()
             del dummy.required_name
             with pytest.raises(exceptions.ValidationError) as exc:
-                yield from dummy.commit()
+                await dummy.commit()
             assert exc.value.messages == {'required_name': ['Missing data for required field.']}
 
         loop.run_until_complete(do_test())
 
     def test_reference(self, loop, classroom_model):
 
-        @asyncio.coroutine
-        def do_test():
+        async def do_test():
 
             teacher = classroom_model.Teacher(name='M. Strickland')
-            yield from teacher.commit()
+            await teacher.commit()
             course = classroom_model.Course(name='Hoverboard 101', teacher=teacher)
-            yield from course.commit()
+            await course.commit()
             assert isinstance(course.teacher, Reference)
-            teacher_fetched = yield from course.teacher.fetch()
+            teacher_fetched = await course.teacher.fetch()
             assert teacher_fetched == teacher
             # Change in referenced document is not seen until referenced
             # document is committed and referencer is reloaded
             teacher.name = 'Dr. Brown'
-            teacher_fetched = yield from course.teacher.fetch()
+            teacher_fetched = await course.teacher.fetch()
             assert teacher_fetched.name == 'M. Strickland'
-            yield from teacher.commit()
-            teacher_fetched = yield from course.teacher.fetch()
+            await teacher.commit()
+            teacher_fetched = await course.teacher.fetch()
             assert teacher_fetched.name == 'M. Strickland'
-            yield from course.reload()
-            teacher_fetched = yield from course.teacher.fetch()
+            await course.reload()
+            teacher_fetched = await course.teacher.fetch()
             assert teacher_fetched.name == 'Dr. Brown'
             # But we can force reload as soon as referenced document is committed
             # without having to reload the whole referencer
             teacher.name = 'M. Strickland'
-            teacher_fetched = yield from course.teacher.fetch()
+            teacher_fetched = await course.teacher.fetch()
             assert teacher_fetched.name == 'Dr. Brown'
-            teacher_fetched = yield from course.teacher.fetch(force_reload=True)
+            teacher_fetched = await course.teacher.fetch(force_reload=True)
             assert teacher_fetched.name == 'Dr. Brown'
-            yield from teacher.commit()
-            teacher_fetched = yield from course.teacher.fetch()
+            await teacher.commit()
+            teacher_fetched = await course.teacher.fetch()
             assert teacher_fetched.name == 'Dr. Brown'
-            teacher_fetched = yield from course.teacher.fetch(force_reload=True)
+            teacher_fetched = await course.teacher.fetch(force_reload=True)
             assert teacher_fetched.name == 'M. Strickland'
             # Test bad ref as well
             course.teacher = Reference(classroom_model.Teacher, ObjectId())
             with pytest.raises(exceptions.ValidationError) as exc:
-                yield from course.io_validate()
+                await course.io_validate()
             assert exc.value.messages == {'teacher': ['Reference not found for document Teacher.']}
 
         loop.run_until_complete(do_test())
 
     def test_io_validate(self, loop, instance, classroom_model):
 
-        @asyncio.coroutine
-        def do_test():
+        async def do_test():
 
             Student = classroom_model.Student
 
             io_field_value = 'io?'
             io_validate_called = False
 
-            def io_validate(field, value):
+            async def io_validate(field, value):
                 assert field == IOStudent.schema.fields['io_field']
                 assert value == io_field_value
                 nonlocal io_validate_called
@@ -335,19 +335,18 @@ class TestMotorAsyncio(BaseDBTest):
             student = IOStudent(name='Marty', io_field=io_field_value)
             assert not io_validate_called
 
-            yield from student.io_validate()
+            await student.io_validate()
             assert io_validate_called
 
         loop.run_until_complete(do_test())
 
     def test_io_validate_error(self, loop, instance, classroom_model):
 
-        @asyncio.coroutine
-        def do_test():
+        async def do_test():
 
             Student = classroom_model.Student
 
-            def io_validate(field, value):
+            async def io_validate(field, value):
                 raise exceptions.ValidationError('Ho boys !')
 
             @instance.register
@@ -370,7 +369,7 @@ class TestMotorAsyncio(BaseDBTest):
                 embedded_io_field={'io_field': 42}
             )
             with pytest.raises(exceptions.ValidationError) as exc:
-                yield from student.io_validate()
+                await student.io_validate()
             assert exc.value.messages == {
                 'io_field': ['Ho boys !'],
                 'list_io_field': {0: ['Ho boys !'], 1: ['Ho boys !']},
@@ -382,8 +381,7 @@ class TestMotorAsyncio(BaseDBTest):
 
     def test_io_validate_multi_validate(self, loop, instance, classroom_model):
 
-        @asyncio.coroutine
-        def do_test():
+        async def do_test():
 
             Student = classroom_model.Student
             called = []
@@ -393,24 +391,24 @@ class TestMotorAsyncio(BaseDBTest):
             future3 = asyncio.Future()
             future4 = asyncio.Future()
 
-            def io_validate11(field, value):
+            async def io_validate11(field, value):
                 called.append(1)
                 future1.set_result(None)
-                yield from future3
+                await future3
                 called.append(4)
                 future4.set_result(None)
 
-            def io_validate12(field, value):
-                yield from future4
+            async def io_validate12(field, value):
+                await future4
                 called.append(5)
 
-            def io_validate21(field, value):
-                yield from future2
+            async def io_validate21(field, value):
+                await future2
                 called.append(3)
                 future3.set_result(None)
 
-            def io_validate22(field, value):
-                yield from future1
+            async def io_validate22(field, value):
+                await future1
                 called.append(2)
                 future2.set_result(None)
 
@@ -420,26 +418,25 @@ class TestMotorAsyncio(BaseDBTest):
                 io_field2 = fields.StrField(io_validate=(io_validate21, io_validate22))
 
             student = IOStudent(name='Marty', io_field1='io1', io_field2='io2')
-            yield from student.io_validate()
+            await student.io_validate()
             assert called == [1, 2, 3, 4, 5]
 
         loop.run_until_complete(do_test())
 
     def test_io_validate_list(self, loop, instance, classroom_model):
 
-        @asyncio.coroutine
-        def do_test():
+        async def do_test():
 
             Student = classroom_model.Student
             called = []
 
             values = [1, 2, 3, 4]
             total = len(values)
-            futures = [asyncio.Future() for _ in range(total*2)]
+            futures = [asyncio.Future() for _ in range(total * 2)]
 
-            def io_validate(field, value):
+            async def io_validate(field, value):
                 futures[total - value + 1].set_result(None)
-                yield from futures[value]
+                await futures[value]
                 called.append(value)
 
             @instance.register
@@ -447,15 +444,14 @@ class TestMotorAsyncio(BaseDBTest):
                 io_field = fields.ListField(fields.IntField(io_validate=io_validate))
 
             student = IOStudent(name='Marty', io_field=values)
-            yield from student.io_validate()
+            await student.io_validate()
             assert set(called) == set(values)
 
         loop.run_until_complete(do_test())
 
     def test_indexes(self, loop, instance):
 
-        @asyncio.coroutine
-        def do_test():
+        async def do_test():
 
             @instance.register
             class SimpleIndexDoc(Document):
@@ -466,11 +462,11 @@ class TestMotorAsyncio(BaseDBTest):
                     collection = 'simple_index_doc'
                     indexes = ['indexed']
 
-            yield from SimpleIndexDoc.collection.drop_indexes()
+            await SimpleIndexDoc.collection.drop_indexes()
 
             # Now ask for indexes building
-            yield from SimpleIndexDoc.ensure_indexes()
-            indexes = yield from SimpleIndexDoc.collection.index_information()
+            await SimpleIndexDoc.ensure_indexes()
+            indexes = await SimpleIndexDoc.collection.index_information()
             expected_indexes = {
                 '_id_': {
                     'key': [('_id', 1)],
@@ -482,16 +478,15 @@ class TestMotorAsyncio(BaseDBTest):
             assert _stripped(indexes) == expected_indexes
 
             # Redoing indexes building should do nothing
-            yield from SimpleIndexDoc.ensure_indexes()
-            indexes = yield from SimpleIndexDoc.collection.index_information()
+            await SimpleIndexDoc.ensure_indexes()
+            indexes = await SimpleIndexDoc.collection.index_information()
             assert _stripped(indexes) == expected_indexes
 
         loop.run_until_complete(do_test())
 
     def test_indexes_inheritance(self, loop, instance):
 
-        @asyncio.coroutine
-        def do_test():
+        async def do_test():
 
             @instance.register
             class SimpleIndexDoc(Document):
@@ -502,11 +497,11 @@ class TestMotorAsyncio(BaseDBTest):
                     collection = 'simple_index_doc'
                     indexes = ['indexed']
 
-            yield from SimpleIndexDoc.collection.drop_indexes()
+            await SimpleIndexDoc.collection.drop_indexes()
 
             # Now ask for indexes building
-            yield from SimpleIndexDoc.ensure_indexes()
-            indexes = yield from SimpleIndexDoc.collection.index_information()
+            await SimpleIndexDoc.ensure_indexes()
+            indexes = await SimpleIndexDoc.collection.index_information()
             expected_indexes = {
                 '_id_': {
                     'key': [('_id', 1)],
@@ -518,16 +513,15 @@ class TestMotorAsyncio(BaseDBTest):
             assert _stripped(indexes) == expected_indexes
 
             # Redoing indexes building should do nothing
-            yield from SimpleIndexDoc.ensure_indexes()
-            indexes = yield from SimpleIndexDoc.collection.index_information()
+            await SimpleIndexDoc.ensure_indexes()
+            indexes = await SimpleIndexDoc.collection.index_information()
             assert _stripped(indexes) == expected_indexes
 
         loop.run_until_complete(do_test())
 
     def test_unique_index(self, loop, instance):
 
-        @asyncio.coroutine
-        def do_test():
+        async def do_test():
 
             @instance.register
             class UniqueIndexDoc(Document):
@@ -538,12 +532,12 @@ class TestMotorAsyncio(BaseDBTest):
                 class Meta:
                     collection = 'unique_index_doc'
 
-            yield from UniqueIndexDoc.collection.drop()
-            yield from UniqueIndexDoc.collection.drop_indexes()
+            await UniqueIndexDoc.collection.drop()
+            await UniqueIndexDoc.collection.drop_indexes()
 
             # Now ask for indexes building
-            yield from UniqueIndexDoc.ensure_indexes()
-            indexes = yield from UniqueIndexDoc.collection.index_information()
+            await UniqueIndexDoc.ensure_indexes()
+            indexes = await UniqueIndexDoc.collection.index_information()
             expected_indexes = {
                 '_id_': {
                     'key': [('_id', 1)],
@@ -561,25 +555,24 @@ class TestMotorAsyncio(BaseDBTest):
             assert _stripped(indexes) == expected_indexes
 
             # Redoing indexes building should do nothing
-            yield from UniqueIndexDoc.ensure_indexes()
-            indexes = yield from UniqueIndexDoc.collection.index_information()
+            await UniqueIndexDoc.ensure_indexes()
+            indexes = await UniqueIndexDoc.collection.index_information()
             assert _stripped(indexes) == expected_indexes
 
-            yield from UniqueIndexDoc(not_unique='a', required_unique=1).commit()
-            yield from UniqueIndexDoc(not_unique='a', sparse_unique=1, required_unique=2).commit()
+            await UniqueIndexDoc(not_unique='a', required_unique=1).commit()
+            await UniqueIndexDoc(not_unique='a', sparse_unique=1, required_unique=2).commit()
             with pytest.raises(exceptions.ValidationError) as exc:
-                yield from UniqueIndexDoc(not_unique='a', required_unique=1).commit()
+                await UniqueIndexDoc(not_unique='a', required_unique=1).commit()
             assert exc.value.messages == {'required_unique': 'Field value must be unique.'}
             with pytest.raises(exceptions.ValidationError) as exc:
-                yield from UniqueIndexDoc(not_unique='a', sparse_unique=1, required_unique=3).commit()
+                await UniqueIndexDoc(not_unique='a', sparse_unique=1, required_unique=3).commit()
             assert exc.value.messages == {'sparse_unique': 'Field value must be unique.'}
 
         loop.run_until_complete(do_test())
 
     def test_unique_index_compound(self, loop, instance):
 
-        @asyncio.coroutine
-        def do_test():
+        async def do_test():
 
             @instance.register
             class UniqueIndexCompoundDoc(Document):
@@ -592,12 +585,12 @@ class TestMotorAsyncio(BaseDBTest):
                     # Must define custom index to do that
                     indexes = [{'key': ('compound1', 'compound2'), 'unique': True}]
 
-            yield from UniqueIndexCompoundDoc.collection.drop()
-            yield from UniqueIndexCompoundDoc.collection.drop_indexes()
+            await UniqueIndexCompoundDoc.collection.drop()
+            await UniqueIndexCompoundDoc.collection.drop_indexes()
 
             # Now ask for indexes building
-            yield from UniqueIndexCompoundDoc.ensure_indexes()
-            indexes = yield from UniqueIndexCompoundDoc.collection.index_information()
+            await UniqueIndexCompoundDoc.ensure_indexes()
+            indexes = await UniqueIndexCompoundDoc.collection.index_information()
             # Must sort compound indexes to avoid random inconsistence
             indexes['compound1_1_compound2_1']['key'] = sorted(indexes['compound1_1_compound2_1']['key'])
             expected_indexes = {
@@ -612,25 +605,25 @@ class TestMotorAsyncio(BaseDBTest):
             assert _stripped(indexes) == expected_indexes
 
             # Redoing indexes building should do nothing
-            yield from UniqueIndexCompoundDoc.ensure_indexes()
-            indexes = yield from UniqueIndexCompoundDoc.collection.index_information()
+            await UniqueIndexCompoundDoc.ensure_indexes()
+            indexes = await UniqueIndexCompoundDoc.collection.index_information()
             # Must sort compound indexes to avoid random inconsistence
             indexes['compound1_1_compound2_1']['key'] = sorted(indexes['compound1_1_compound2_1']['key'])
             assert _stripped(indexes) == expected_indexes
 
             # Index is on the tuple (compound1, compound2)
-            yield from UniqueIndexCompoundDoc(not_unique='a', compound1=1, compound2=1).commit()
-            yield from UniqueIndexCompoundDoc(not_unique='a', compound1=1, compound2=2).commit()
-            yield from UniqueIndexCompoundDoc(not_unique='a', compound1=2, compound2=1).commit()
-            yield from UniqueIndexCompoundDoc(not_unique='a', compound1=2, compound2=2).commit()
+            await UniqueIndexCompoundDoc(not_unique='a', compound1=1, compound2=1).commit()
+            await UniqueIndexCompoundDoc(not_unique='a', compound1=1, compound2=2).commit()
+            await UniqueIndexCompoundDoc(not_unique='a', compound1=2, compound2=1).commit()
+            await UniqueIndexCompoundDoc(not_unique='a', compound1=2, compound2=2).commit()
             with pytest.raises(exceptions.ValidationError) as exc:
-                yield from UniqueIndexCompoundDoc(not_unique='a', compound1=1, compound2=1).commit()
+                await UniqueIndexCompoundDoc(not_unique='a', compound1=1, compound2=1).commit()
             assert exc.value.messages == {
                 'compound2': "Values of fields ['compound1', 'compound2'] must be unique together.",
                 'compound1': "Values of fields ['compound1', 'compound2'] must be unique together."
             }
             with pytest.raises(exceptions.ValidationError) as exc:
-                yield from UniqueIndexCompoundDoc(not_unique='a', compound1=2, compound2=1).commit()
+                await UniqueIndexCompoundDoc(not_unique='a', compound1=2, compound2=1).commit()
             assert exc.value.messages == {
                 'compound2': "Values of fields ['compound1', 'compound2'] must be unique together.",
                 'compound1': "Values of fields ['compound1', 'compound2'] must be unique together."
@@ -641,8 +634,7 @@ class TestMotorAsyncio(BaseDBTest):
     @pytest.mark.xfail
     def test_unique_index_inheritance(self, loop, instance):
 
-        @asyncio.coroutine
-        def do_test():
+        async def do_test():
 
             @instance.register
             class UniqueIndexParentDoc(Document):
@@ -662,11 +654,13 @@ class TestMotorAsyncio(BaseDBTest):
                 class Meta:
                     indexes = ['manual_index']
 
-            yield from UniqueIndexChildDoc.collection.drop_indexes()
+            await UniqueIndexChildDoc.collection.drop_indexes()
 
             # Now ask for indexes building
-            yield from UniqueIndexChildDoc.ensure_indexes()
-            indexes = [e for e in (yield from UniqueIndexChildDoc.collection.list_indexes())]
+            await UniqueIndexChildDoc.ensure_indexes()
+            indexes = []
+            async for index in UniqueIndexChildDoc.collection.list_indexes():
+                indexes.append(index)
             expected_indexes = [
                 {
                     'key': {'_id': 1},
@@ -700,16 +694,15 @@ class TestMotorAsyncio(BaseDBTest):
             assert name_sorted(indexes) == name_sorted(expected_indexes)
 
             # Redoing indexes building should do nothing
-            yield from UniqueIndexChildDoc.ensure_indexes()
-            indexes = [e for e in (yield from UniqueIndexChildDoc.collection.list_indexes())]
+            await UniqueIndexChildDoc.ensure_indexes()
+            indexes = [e for e in (await UniqueIndexChildDoc.collection.list_indexes())]
             assert name_sorted(indexes) == name_sorted(expected_indexes)
 
         loop.run_until_complete(do_test())
 
     def test_inheritance_search(self, loop, instance):
 
-        @asyncio.coroutine
-        def do_test():
+        async def do_test():
 
             @instance.register
             class InheritanceSearchParent(Document):
@@ -734,36 +727,35 @@ class TestMotorAsyncio(BaseDBTest):
             class InheritanceSearchChild2(InheritanceSearchParent):
                 c2f = fields.IntField(required=True)
 
-            yield from InheritanceSearchParent.collection.drop()
+            await InheritanceSearchParent.collection.drop()
 
-            yield from InheritanceSearchParent(pf=0).commit()
-            yield from InheritanceSearchChild1(pf=1, c1f=1).commit()
-            yield from InheritanceSearchChild1Child(pf=1, sc1f=1).commit()
-            yield from InheritanceSearchChild2(pf=2, c2f=2).commit()
+            await InheritanceSearchParent(pf=0).commit()
+            await InheritanceSearchChild1(pf=1, c1f=1).commit()
+            await InheritanceSearchChild1Child(pf=1, sc1f=1).commit()
+            await InheritanceSearchChild2(pf=2, c2f=2).commit()
 
-            assert (yield from InheritanceSearchParent.find().count()) == 4
-            assert (yield from InheritanceSearchChild1.find().count()) == 2
-            assert (yield from InheritanceSearchChild1Child.find().count()) == 1
-            assert (yield from InheritanceSearchChild2.find().count()) == 1
+            assert (await InheritanceSearchParent.find().count()) == 4
+            assert (await InheritanceSearchChild1.find().count()) == 2
+            assert (await InheritanceSearchChild1Child.find().count()) == 1
+            assert (await InheritanceSearchChild2.find().count()) == 1
 
-            res = yield from InheritanceSearchParent.find_one({'sc1f': 1})
+            res = await InheritanceSearchParent.find_one({'sc1f': 1})
             assert isinstance(res, InheritanceSearchChild1Child)
 
             cursor = InheritanceSearchParent.find({'pf': 1})
-            for r in (yield from cursor.to_list(length=100)):
+            for r in (await cursor.to_list(length=100)):
                 assert isinstance(r, InheritanceSearchChild1)
 
             isc = InheritanceSearchChild1(pf=2, c1f=2)
-            yield from isc.commit()
-            res = yield from InheritanceSearchChild1.find_one(isc.id)
+            await isc.commit()
+            res = await InheritanceSearchChild1.find_one(isc.id)
             assert res == isc
 
         loop.run_until_complete(do_test())
 
     def test_search(self, loop, instance):
 
-        @asyncio.coroutine
-        def do_test():
+        async def do_test():
 
             @instance.register
             class Author(EmbeddedDocument):
@@ -779,8 +771,8 @@ class TestMotorAsyncio(BaseDBTest):
                 author = fields.EmbeddedField(Author, attribute='a')
                 chapters = fields.ListField(fields.EmbeddedField(Chapter), attribute='c')
 
-            yield from Book.collection.drop()
-            yield from Book(
+            await Book.collection.drop()
+            await Book(
                 title='The Hobbit',
                 author={'name': 'JRR Tolkien'},
                 chapters=[
@@ -789,18 +781,20 @@ class TestMotorAsyncio(BaseDBTest):
                     {'name': 'A Short Rest'},
                     {'name': 'Over Hill And Under Hill'},
                     {'name': 'Riddles In The Dark'}
-            ]).commit()
-            yield from Book(
+                ]
+            ).commit()
+            await Book(
                 title="Harry Potter and the Philosopher's Stone",
-                 author={'name': 'JK Rowling'},
-                 chapters=[
+                author={'name': 'JK Rowling'},
+                chapters=[
                     {'name': 'The Boy Who Lived'},
                     {'name': 'The Vanishing Glass'},
                     {'name': 'The Letters from No One'},
                     {'name': 'The Keeper of the Keys'},
                     {'name': 'Diagon Alley'}
-            ]).commit()
-            yield from Book(
+                ]
+            ).commit()
+            await Book(
                 title='A Game of Thrones',
                 author={'name': 'George RR Martin'},
                 chapters=[
@@ -810,23 +804,23 @@ class TestMotorAsyncio(BaseDBTest):
                     {'name': 'Daenerys I'},
                     {'name': 'Eddard I'},
                     {'name': 'Jon I'}
-            ]).commit()
+                ]
+            ).commit()
 
-            res = yield from Book.find({'title': 'The Hobbit'}).count()
+            res = await Book.find({'title': 'The Hobbit'}).count()
             assert res == 1
-            res = yield from Book.find({'author.name': {'$in': ['JK Rowling', 'JRR Tolkien']}}).count()
+            res = await Book.find({'author.name': {'$in': ['JK Rowling', 'JRR Tolkien']}}).count()
             assert res == 2
-            res = yield from Book.find({'$and': [{'chapters.name': 'Roast Mutton'}, {'title': 'The Hobbit'}]}).count()
+            res = await Book.find({'$and': [{'chapters.name': 'Roast Mutton'}, {'title': 'The Hobbit'}]}).count()
             assert res == 1
-            res = yield from Book.find({'chapters.name': {'$all': ['Roast Mutton', 'A Short Rest']}}).count()
+            res = await Book.find({'chapters.name': {'$all': ['Roast Mutton', 'A Short Rest']}}).count()
             assert res == 1
 
         loop.run_until_complete(do_test())
 
     def test_pre_post_hooks(self, loop, instance):
 
-        @asyncio.coroutine
-        def do_test():
+        async def do_test():
 
             callbacks = []
 
@@ -856,26 +850,24 @@ class TestMotorAsyncio(BaseDBTest):
                     assert isinstance(ret, DeleteResult)
                     callbacks.append('post_delete')
 
-
             p = Person(name='John', age=20)
-            yield from p.commit()
+            await p.commit()
             assert callbacks == ['pre_insert', 'post_insert']
 
             callbacks.clear()
             p.age = 22
-            yield from p.commit({'age': 22})
+            await p.commit({'age': 22})
             assert callbacks == ['pre_update', 'post_update']
 
             callbacks.clear()
-            yield from p.delete()
+            await p.delete()
             assert callbacks == ['pre_delete', 'post_delete']
 
         loop.run_until_complete(do_test())
 
     def test_pre_post_hooks_with_defers(self, loop, instance):
 
-        @asyncio.coroutine
-        def do_test():
+        async def do_test():
 
             events = []
 
@@ -884,22 +876,22 @@ class TestMotorAsyncio(BaseDBTest):
                 name = fields.StrField()
                 age = fields.IntField()
 
-                def pre_insert(self):
+                async def pre_insert(self):
                     events.append('start pre_insert')
                     future = asyncio.Future()
                     future.set_result(True)
-                    yield from future
+                    await future
                     events.append('end pre_insert')
 
-                def post_insert(self, ret):
+                async def post_insert(self, ret):
                     events.append('start post_insert')
                     future = asyncio.Future()
                     future.set_result(True)
-                    yield from future
+                    await future
                     events.append('end post_insert')
 
             p = Person(name='John', age=20)
-            yield from p.commit()
+            await p.commit()
             assert events == [
                 'start pre_insert',
                 'end pre_insert',
@@ -911,8 +903,7 @@ class TestMotorAsyncio(BaseDBTest):
 
     def test_modify_in_pre_hook(self, loop, instance):
 
-        @asyncio.coroutine
-        def do_test():
+        async def do_test():
 
             @instance.register
             class Person(Document):
@@ -932,44 +923,31 @@ class TestMotorAsyncio(BaseDBTest):
                 def pre_delete(self):
                     return {'version': self.version}
 
-
             p = Person(name='John', age=20)
-            yield from p.commit()
+            await p.commit()
 
             assert p.version == 1
-            p_concurrent = yield from Person.find_one(p.pk)
+            p_concurrent = await Person.find_one(p.pk)
 
             p.age = 22
-            yield from p.commit()
+            await p.commit()
             assert p.version == 2
 
             # Concurrent should not be able to commit it modifications
             p_concurrent.name = 'John'
             with pytest.raises(exceptions.UpdateError):
-                yield from p_concurrent.commit()
+                await p_concurrent.commit()
 
-            yield from p_concurrent.reload()
+            await p_concurrent.reload()
             assert p_concurrent.version == 2
 
             p.age = 24
-            yield from p.commit()
+            await p.commit()
             assert p.version == 3
-            yield from p.delete()
-            yield from p.commit()
+            await p.delete()
+            await p.commit()
             with pytest.raises(exceptions.DeleteError):
-                yield from p_concurrent.delete()
-            yield from p.delete()
+                await p_concurrent.delete()
+            await p.delete()
 
         loop.run_until_complete(do_test())
-
-
-@pytest.mark.skipif(dep_error is not None, reason=dep_error)
-class TestAwaitSyntax(BaseDBTest):
-
-    def test_base(self, loop, instance):
-        try:
-            from .await_syntax import test_await_syntax
-            loop.run_until_complete(test_await_syntax(instance))
-        except SyntaxError:
-            # Await syntax not supported (Python < 3.5)
-            pass

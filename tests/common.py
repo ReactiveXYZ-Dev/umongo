@@ -61,6 +61,7 @@ class MockedBuilder(BaseBuilder):
     def is_compatible_with(db):
         return isinstance(db, MockedDB)
 
+
 register_builder(MockedBuilder)
 
 

@@ -1,4 +1,5 @@
 from datetime import datetime
+
 from umongo import Document, EmbeddedDocument, fields
 from umongo.query_mapper import map_query
 

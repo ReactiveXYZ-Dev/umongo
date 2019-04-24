@@ -1,3 +1,4 @@
+from marshmallow import missing
 from .instance import Instance
 from .frameworks import (
     PyMongoInstance,
@@ -36,8 +37,10 @@ from .i18n import set_gettext
 
 __author__ = 'Emmanuel Leblond'
 __email__ = 'emmanuel.leblond@gmail.com'
-__version__ = '1.2.0'
+__version__ = '2.0.3'
 __all__ = (
+    'missing',
+
     'Instance',
     'PyMongoInstance',
     'TxMongoInstance',

@@ -1,11 +1,12 @@
 from decimal import Decimal
-
-from bson import ObjectId, DBRef, Decimal128
-import pytest
-from datetime import datetime
-from dateutil.tz.tz import tzutc, tzoffset
-from marshmallow import ValidationError
+import datetime as dt
 from uuid import UUID
+
+import pytest
+
+from dateutil.tz.tz import tzutc, tzoffset
+from bson import ObjectId, DBRef, Decimal128
+from marshmallow import ValidationError, missing
 
 from umongo.data_proxy import data_proxy_factory
 from umongo import Document, EmbeddedDocument, Schema, EmbeddedSchema, fields, Reference
@@ -24,7 +25,7 @@ class TestRequired(BaseTest):
             name = fields.StrField(required=True)
             birthday = fields.DateTimeField()
 
-        person = Person(birthday=datetime(1968, 6, 9))
+        person = Person(birthday=dt.datetime(1968, 6, 9))
 
         # required should be called during commit
         with pytest.raises(ValidationError) as exc:
@@ -150,16 +151,39 @@ class TestFields(BaseTest):
 
         class MySchema(EmbeddedSchema):
             a = fields.DateTimeField()
+            b = fields.LocalDateTimeField()
 
         s = MySchema(strict=True)
-        data, _ = s.load({'a': datetime(2016, 8, 6)})
-        assert data['a'] == datetime(2016, 8, 6)
+        data, _ = s.load({'a': dt.datetime(2016, 8, 6)})
+        assert data['a'] == dt.datetime(2016, 8, 6)
         data, _ = s.load({'a': "2016-08-06T00:00:00Z"})
-        assert data['a'] == datetime(2016, 8, 6, tzinfo=tzutc())
+        assert data['a'] == dt.datetime(2016, 8, 6, tzinfo=tzutc())
         data, _ = s.load({'a': "2016-08-06T00:00:00"})
-        assert data['a'] == datetime(2016, 8, 6)
+        assert data['a'] == dt.datetime(2016, 8, 6)
         with pytest.raises(ValidationError):
             s.load({'a': "dummy"})
+
+        # Test DateTimeField and LocalDateTimeField round to milliseconds
+        s = MySchema()
+        data, _ = s.load({
+            'a': dt.datetime(2016, 8, 6, 12, 30, 30, 123456),
+            'b': dt.datetime(2016, 8, 6, 12, 30, 30, 123456),
+        })
+        assert data['a'].microsecond == 123000
+        assert data['b'].microsecond == 123000
+        s = MySchema()
+        data, _ = s.load({
+            'a': dt.datetime(2016, 8, 6, 12, 59, 59, 999876),
+            'b': dt.datetime(2016, 8, 6, 12, 59, 59, 999876),
+        })
+        assert data['a'].hour == 13
+        assert data['b'].hour == 13
+        assert data['a'].minute == 0
+        assert data['b'].minute == 0
+        assert data['a'].second == 0
+        assert data['b'].second == 0
+        assert data['a'].microsecond == 0
+        assert data['b'].microsecond == 0
 
     def test_strictdatetime(self):
 
@@ -172,24 +196,24 @@ class TestFields(BaseTest):
         s = MySchema(strict=True)
 
         for date in (
-            datetime(2016, 8, 6),
-            datetime(2016, 8, 6, tzinfo=tzutc()),
+            dt.datetime(2016, 8, 6),
+            dt.datetime(2016, 8, 6, tzinfo=tzutc()),
             "2016-08-06T00:00:00Z",
             "2016-08-06T00:00:00",
         ):
             data, _ = s.load({'a': date, 'b': date, 'c': date})
-            assert data['a'] == datetime(2016, 8, 6)
-            assert data['b'] == datetime(2016, 8, 6)
-            assert data['c'] == datetime(2016, 8, 6, tzinfo=tzutc())
+            assert data['a'] == dt.datetime(2016, 8, 6)
+            assert data['b'] == dt.datetime(2016, 8, 6)
+            assert data['c'] == dt.datetime(2016, 8, 6, tzinfo=tzutc())
 
         for date in (
             "2016-08-06T00:00:00+02:00",
-            datetime(2016, 8, 6, tzinfo=tzoffset(None, 7200)),
+            dt.datetime(2016, 8, 6, tzinfo=tzoffset(None, 7200)),
         ):
             data, _ = s.load({'a': date, 'b': date, 'c': date})
-            assert data['a'] == datetime(2016, 8, 5, 22, 0)
-            assert data['b'] == datetime(2016, 8, 5, 22, 0)
-            assert data['c'] == datetime(2016, 8, 6, tzinfo=tzoffset(None, 7200))
+            assert data['a'] == dt.datetime(2016, 8, 5, 22, 0)
+            assert data['b'] == dt.datetime(2016, 8, 5, 22, 0)
+            assert data['c'] == dt.datetime(2016, 8, 6, tzinfo=tzoffset(None, 7200))
 
         with pytest.raises(ValidationError):
             s.load({'a': "dummy"})
@@ -199,21 +223,52 @@ class TestFields(BaseTest):
         d = MyDataProxy()
 
         for date in (
-            datetime(2016, 8, 6),
-            datetime(2016, 8, 6, tzinfo=tzutc()),
+            dt.datetime(2016, 8, 6),
+            dt.datetime(2016, 8, 6, tzinfo=tzutc()),
         ):
             d.from_mongo({'a': date, 'b': date, 'c': date})
-            assert d.get('a') == datetime(2016, 8, 6)
-            assert d.get('b') == datetime(2016, 8, 6)
-            assert d.get('c') == datetime(2016, 8, 6, tzinfo=tzutc())
+            assert d.get('a') == dt.datetime(2016, 8, 6)
+            assert d.get('b') == dt.datetime(2016, 8, 6)
+            assert d.get('c') == dt.datetime(2016, 8, 6, tzinfo=tzutc())
 
         for date in (
-            datetime(2016, 8, 6, tzinfo=tzoffset(None, 7200)),
+            dt.datetime(2016, 8, 6, tzinfo=tzoffset(None, 7200)),
         ):
             d.from_mongo({'a': date, 'b': date, 'c': date})
-            assert d.get('a') == datetime(2016, 8, 5, 22, 0)
-            assert d.get('b') == datetime(2016, 8, 5, 22, 0)
-            assert d.get('c') == datetime(2016, 8, 6, tzinfo=tzoffset(None, 7200))
+            assert d.get('a') == dt.datetime(2016, 8, 5, 22, 0)
+            assert d.get('b') == dt.datetime(2016, 8, 5, 22, 0)
+            assert d.get('c') == dt.datetime(2016, 8, 6, tzinfo=tzoffset(None, 7200))
+
+        # Test StrictDateTimeField rounds to milliseconds
+        s = MySchema()
+        data, _ = s.load({'a': dt.datetime(2016, 8, 6, 12, 30, 30, 123456)})
+        assert data['a'].microsecond == 123000
+        data, _ = s.load({'a': dt.datetime(2016, 8, 6, 12, 59, 59, 999876)})
+        assert data['a'].hour == 13
+        assert data['a'].minute == 0
+        assert data['a'].second == 0
+        assert data['a'].microsecond == 0
+
+    def test_date(self):
+
+        class MySchema(EmbeddedSchema):
+            a = fields.DateField()
+
+        s = MySchema(strict=True)
+        data, _ = s.load({'a': dt.date(2016, 8, 6)})
+        assert data['a'] == dt.date(2016, 8, 6)
+        data, _ = s.load({'a': "2016-08-06"})
+        assert data['a'] == dt.date(2016, 8, 6)
+        with pytest.raises(ValidationError):
+            s.load({'a': "dummy"})
+
+        # Test _serialize_to_mongo / _deserialize_from_mongo
+        MyDataProxy = data_proxy_factory('My', MySchema())
+        d = MyDataProxy()
+
+        d.from_mongo({'a': dt.datetime(2019, 8, 6)})
+        assert d.get('a') == dt.date(2019, 8, 6)
+        assert d.to_mongo() == {'a': dt.datetime(2019, 8, 6)}
 
     def test_dict(self):
 
@@ -241,29 +296,58 @@ class TestFields(BaseTest):
         d2 = MyDataProxy({'dict': {'a': 1, 'b': {'c': True}}})
         assert d2.to_mongo() == {'in_mongo_dict': {'a': 1, 'b': {'c': True}}}
 
-        # Empty dict is considered as missing field
         d2.set('dict', {})
+        assert d2.to_mongo() == {'in_mongo_dict': {}}
+        assert d2.to_mongo(update=True) == {'$set': {'in_mongo_dict': {}}}
+        d2.delete('dict')
         assert d2.to_mongo() == {}
         assert d2.to_mongo(update=True) == {'$unset': {'in_mongo_dict': ''}}
 
         d3 = MyDataProxy()
         d3.from_mongo({})
-        assert isinstance(d3.get('dict'), Dict)
+        assert d3.get('dict') is missing
         assert d3.to_mongo() == {}
         assert d3.to_mongo(update=True) is None
+
+        d3.from_mongo({'in_mongo_dict': {}})
+        assert d3._data.get('in_mongo_dict') == {}
         d3.get('dict')['field'] = 'value'
         assert d3.to_mongo(update=True) is None
         d3.get('dict').set_modified()
         assert d3.to_mongo(update=True) == {'$set': {'in_mongo_dict': {'field': 'value'}}}
         assert d3.to_mongo() == {'in_mongo_dict': {'field': 'value'}}
 
-        d3.from_mongo({'in_mongo_dict': {}})
-        assert d3._data.get('in_mongo_dict') == {}
-
         d4 = MyDataProxy({'dict': None})
         assert d4.to_mongo() == {'in_mongo_dict': None}
         d4.from_mongo({'in_mongo_dict': None})
         assert d4.get('dict') is None
+
+    def test_dict_default(self):
+
+        class MySchema(Schema):
+            # Passing a mutable as default is a bad idea in real life
+            d_dict = fields.DictField(default={'1': 1, '2': 2})
+            c_dict = fields.DictField(default=lambda: {'1': 1, '2': 2})
+
+        MyDataProxy = data_proxy_factory('My', MySchema())
+        d = MyDataProxy()
+        assert d.to_mongo() == {
+            'd_dict': {'1': 1, '2': 2},
+            'c_dict': {'1': 1, '2': 2},
+        }
+        assert isinstance(d.get('d_dict'), Dict)
+        assert isinstance(d.get('c_dict'), Dict)
+        d.get('d_dict')['3'] = 3
+        d.get('c_dict')['3'] = 3
+
+        d.delete('d_dict')
+        d.delete('c_dict')
+        assert d.to_mongo() == {
+            'd_dict': {'1': 1, '2': 2},
+            'c_dict': {'1': 1, '2': 2},
+        }
+        assert isinstance(d.get('d_dict'), Dict)
+        assert isinstance(d.get('c_dict'), Dict)
 
     def test_list(self):
 
@@ -294,6 +378,10 @@ class TestFields(BaseTest):
         d.clear_modified()
         d.get('list').clear()
         assert d.dump() == {'list': []}
+        assert d.to_mongo() == {'in_mongo_list': []}
+        assert d.to_mongo(update=True) == {'$set': {'in_mongo_list': []}}
+        d.delete('list')
+        assert d.to_mongo() == {}
         assert d.to_mongo(update=True) == {'$unset': {'in_mongo_list': ''}}
 
         d.set('list', [1, 2, 3])
@@ -324,8 +412,10 @@ class TestFields(BaseTest):
 
         d2 = MyDataProxy()
         d2.from_mongo({})
-        assert isinstance(d2.get('list'), List)
+        assert d2.get('list') is missing
         assert d2.to_mongo() == {}
+
+        d2.from_mongo({'in_mongo_list': []})
         d2.get('list').append(1)
         assert d2.to_mongo() == {'in_mongo_list': [1]}
         assert d2.to_mongo(update=True) == {'$set': {'in_mongo_list': [1]}}
@@ -344,7 +434,37 @@ class TestFields(BaseTest):
             d3._data.get('in_mongo_list')
         ) == '<object umongo.data_objects.List([])>'
 
-    def test_complexe_list(self):
+    def test_list_default(self):
+
+        class MySchema(Schema):
+            d_list = fields.ListField(fields.IntField(), default=(1, 2, 3))
+            c_list = fields.ListField(fields.IntField(), default=lambda: (1, 2, 3))
+
+        MyDataProxy = data_proxy_factory('My', MySchema())
+        d = MyDataProxy()
+        assert d.to_mongo() == {
+            'd_list': [1, 2, 3],
+            'c_list': [1, 2, 3],
+        }
+        assert isinstance(d.get('d_list'), List)
+        assert isinstance(d.get('c_list'), List)
+        d.get('d_list').append(4)
+        d.get('c_list').append(4)
+        assert d.to_mongo(update=True) == {
+            '$set': {'c_list': [1, 2, 3, 4], 'd_list': [1, 2, 3, 4]}}
+
+        d.delete('d_list')
+        d.delete('c_list')
+        assert d.to_mongo() == {
+            'd_list': [1, 2, 3],
+            'c_list': [1, 2, 3],
+        }
+        assert isinstance(d.get('d_list'), List)
+        assert isinstance(d.get('c_list'), List)
+        assert d.to_mongo(update=True) == {
+            '$set': {'c_list': [1, 2, 3], 'd_list': [1, 2, 3]}}
+
+    def test_complex_list(self):
 
         @self.instance.register
         class MyEmbeddedDocument(EmbeddedDocument):
@@ -493,12 +613,6 @@ class TestFields(BaseTest):
         d2.from_mongo({'in_mongo_ref': None})
         assert d2.get('ref') is None
 
-        # Test from_mongo behavior with already deserialized data
-        d3 = MyDataProxy()
-        d3.from_mongo({
-            'in_mongo_ref': Reference(MyReferencedDoc, ObjectId("5672d47b1d41c88dcd37ef05"))})
-        assert not isinstance(d3._data['in_mongo_ref'].pk, Reference)
-
     def test_reference_lazy(self):
 
         @self.instance.register
@@ -579,12 +693,6 @@ class TestFields(BaseTest):
         assert d2.to_mongo() == {'in_mongo_gref': None}
         d2.from_mongo({'in_mongo_gref': None})
         assert d2.get('gref') is None
-
-        # Test from_mongo behavior with already deserialized data
-        d3 = MyDataProxy()
-        d3.from_mongo({
-            'in_mongo_gref': Reference(ToRef1, ObjectId("5672d47b1d41c88dcd37ef05"))})
-        assert not isinstance(d3._data['in_mongo_gref'].pk, Reference)
 
     def test_decimal(self):
 

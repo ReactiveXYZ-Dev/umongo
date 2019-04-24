@@ -1,9 +1,9 @@
 from datetime import datetime
+
 from flask import Flask, abort, jsonify, request
-from flask.ext.babel import Babel, gettext
+from flask_babel import Babel, gettext
 from bson import ObjectId
 from pymongo import MongoClient
-import marshmallow
 
 from umongo import Instance, Document, fields, ValidationError, set_gettext
 from umongo.marshmallow_bonus import SchemaFromUmongo

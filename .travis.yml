@@ -1,4 +1,7 @@
-sudo: false
+language: python
+dist: xenial
+cache: pip
+
 services:
 - mongodb
 addons:
@@ -8,31 +11,43 @@ addons:
     packages:
     - mongodb-org-server
     - mongodb-org-shell
-language: python
-python:
-- '3.4'
-- '3.6'
-env:
-- DRIVER=pymongo
-- DRIVER=motor
-- DRIVER=txmongo
+
 before_install:
 - mongo --version
 - pip install -U six
 install:
-- pip install -U tox
-- pip install -U coveralls
-script: tox -e $(echo py$TRAVIS_PYTHON_VERSION-$DRIVER | tr -d .) -- -v
+- travis_retry pip install -U tox
+- travis_retry pip install -U coveralls
+
+script: tox -v
 after_success:
 - coveralls
-deploy:
-  provider: pypi
-  distributions: sdist bdist_wheel
-  user: touilleMan
-  password:
-    secure: N5oj/7qsMQykhuhGE9uXEEyhZXDzRceBV047Z1iFxZKPv2hzimrTqY0Zb87hIeSDCmQEowtVsSD40vSHJ9bqdOKmiCYKRLwgAHDs5RepAtszZmCLNWQS/oiwIXrGzg3kqitxvaym1p4aK4ykUUQo8mBsii8WKxefa5esAZG49ovOEPKaywtAiC7De48ChYoxUnJhcKVDxUTBntORsP81F7gmibbZVeB97nVOzmjWnwlfVrEZ83Oq/rGpbPiK/ydYKonrmDVfrHGuhNS41ZpXqR0UlDSa7OWuw/dB5jZQDUtw57la/7FLuBtoGP5EbOUsWiy6+Kc3pEWrx2EupLKILzVezL27frTW41Y7mkhxkS2gu72BlEIdzUqUG+1/MVWzFbidn7auQ7DZeWH6/rFER/PmCzg7Mfkkomgu/Avqcu+sS4ZevVQfN67Lawk8rHvD8g79xSopfr4W55enss4QA5Kf2ICH3mjBuP9PubgJplHyqHf2hvtGc0ycvVxogzk3Ss7fIxg1UuonuW01Se28Fh06cMYaH0qjs06QDisv9qxrM1TTK81yRbzPqAyjxkqpXLLh8pM5BehkBwel7uVT4obDwvgk/mOpC4XKNSLUa6TjSApGe1QorA3E6kD+6Cr/4YLEcFYUlUtF6JFkT3KkqNlYaDNEM5RhRyeeaUYuIEU=
-  on:
-    tags: true
-    repo: Scille/umongo
-    python: 3.6
-  skip_existing: True
+
+jobs:
+
+  include:
+
+    - { python: '3.7', env: TOXENV=lint }
+    - { python: '3.5', env: TOXENV=py35-pymongo }
+    - { python: '3.5', env: TOXENV=py35-motor }
+    - { python: '3.5', env: TOXENV=py35-txmongo }
+    - { python: '3.7', env: TOXENV=py37-pymongo }
+    - { python: '3.7', env: TOXENV=py37-motor }
+    - { python: '3.7', env: TOXENV=py37-txmongo }
+
+    - stage: PyPI Release
+      if: tag IS present
+      python: '3.7'
+      env: TOXENV=py37-pymongo
+      install: skip
+      script: echo "Releasing to PyPI..."
+      deploy:
+          provider: pypi
+          distributions: sdist bdist_wheel
+          user: touilleMan
+          password:
+            secure: CqBHylDHDlEqMBCFNCt1Wph+FGW3quow5iP6FRF+P4iOaNxCTQCs221/Owjx0AWofe4oYZJsKQR1C0FVEmTGvzId9PMOCd5B0tpGQTHZrxSynHC9c//lF68sXdQKo35+TXCk6cypdnKUDE8XW/lK52jOO5sczh6hXhu2rB1EghXwjpMUA2Kxmn4HIBLGLGlithG9uvUlyoYecGUpWu2evaoEw5FUdHkZZmyKZFuzXrxLTDLiKy6KBzRs2RE0cGmZDSa9afCcNstkJakK9lGk7w1GKodAshbMMwnGn9XTTxyUObTLpiTq7FXgMJMX8YWpkrJnK1YH9a/SiqD9pI/QeMhNV2C1PI3+sneDuu42zhz2palhD9b7gO+gGqQVnQ5TtLZlxl1Z8pI2sOdQc+M6L/AeYinzaUpR55AsjvWcKGp4azjUe6HWAdr/blUZ/5LHLQHGpua8Dq7W8miZ1+AEo3n+WuYRrX1l2fB8eWs25Rli6jZAUmngZtqaQs5l77osBZsOW3gBO+8uzVSBs9kKw16peHyY3YBe+loD5Sy7L9T7kqJgdTEGqixYCbgxVPv17TsyuiZyRBAas7fVJeuBR7Clx0C3p2RVX7ViXwOltaDLYoWW98/Pt4emNYopQJSGNtR8mMUmW8fxPyE2kThM7siGi8MhYZ4YHawuiAD10wY=
+          on:
+            tags: true
+            repo: Scille/umongo
+            python: 3.7

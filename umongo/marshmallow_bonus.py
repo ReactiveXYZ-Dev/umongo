@@ -1,8 +1,8 @@
 from dateutil.tz import tzutc
 
+import bson
 from marshmallow import ValidationError, Schema as MaSchema, missing
 from marshmallow import fields as ma_fields, validates_schema
-import bson
 
 from .i18n import gettext as _
 

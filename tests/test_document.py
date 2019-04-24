@@ -1,8 +1,10 @@
 from copy import copy, deepcopy
+from datetime import datetime
 
 import pytest
-from datetime import datetime
+
 from bson import ObjectId, DBRef
+from marshmallow import validate
 
 from umongo import (Document, EmbeddedDocument, Schema, fields, exceptions,
                     post_dump, pre_load, validates_schema)
@@ -161,7 +163,7 @@ class TestDocument(BaseTest):
             real_pk = fields.IntField(attribute='_id')
 
         crazy = CrazyNaming.build_from_mongo(data={
-            '_id': 1, 'in_mongo__id': 2, 'in_mongo__id': 3, 'pk': 4
+            '_id': 1, 'in_mongo_id': 2, 'in_mongo__id': 3, 'pk': 4
         })
         assert crazy.pk == crazy.real_pk == 1
         assert crazy['pk'] == 4
@@ -406,7 +408,7 @@ class TestDocument(BaseTest):
 
         @self.instance.register
         class Parent(Document):
-            id = fields.ObjectIdField(attribute='_id', missing=ObjectId)
+            id = fields.ObjectIdField(attribute='_id', default=ObjectId)
             name = fields.StrField()
 
         john = Parent(name='John Doe')
@@ -416,6 +418,16 @@ class TestDocument(BaseTest):
         assert isinstance(jane.id, ObjectId)
         assert jane.id != john.id
         assert jane.name == 'John Doe'
+
+    def test_validate_default(self):
+        """Check default values are validated"""
+
+        with pytest.raises(exceptions.ValidationError):
+            class User(Document):
+                name = fields.StringField(
+                    default='Eric',
+                    validate=validate.OneOf(('Stan', 'Kyle', 'Kenny'))
+                )
 
 
 class TestConfig(BaseTest):
@@ -491,6 +503,7 @@ class TestConfig(BaseTest):
         @self.instance.register
         class Animal(Document):
             name = fields.StrField(attribute='_id')  # Overwrite automatic pk
+
             class Meta:
                 allow_inheritance = True
 

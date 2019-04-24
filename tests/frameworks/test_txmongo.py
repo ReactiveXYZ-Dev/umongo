@@ -1,5 +1,7 @@
-import pytest
 from datetime import datetime
+
+import pytest
+
 from bson import ObjectId
 from functools import wraps
 
@@ -35,7 +37,7 @@ from umongo import Document, EmbeddedDocument, fields, exceptions, Reference
 
 
 if not dep_error:  # Make sure the module is valid by importing it
-    from umongo.frameworks import txmongo as framework
+    from umongo.frameworks import txmongo as framework  # noqa
 
 
 # Helper to sort indexes by name in order to have deterministic comparison
@@ -192,6 +194,8 @@ class TestTxMongo(BaseDBTest):
         yield teacher.commit()
         course = classroom_model.Course(name='Hoverboard 101', teacher=teacher)
         yield course.commit()
+        assert student.courses is None
+        student.courses = []
         assert student.courses == []
         student.courses.append(course)
         yield student.commit()
@@ -713,7 +717,8 @@ class TestTxMongo(BaseDBTest):
             chapters = fields.ListField(fields.EmbeddedField(Chapter), attribute='c')
 
         Book.collection.drop()
-        yield Book(title='The Hobbit',
+        yield Book(
+            title='The Hobbit',
             author={'name': 'JRR Tolkien'},
             chapters=[
                 {'name': 'An Unexpected Party'},
@@ -721,17 +726,21 @@ class TestTxMongo(BaseDBTest):
                 {'name': 'A Short Rest'},
                 {'name': 'Over Hill And Under Hill'},
                 {'name': 'Riddles In The Dark'}
-        ]).commit()
-        yield Book(title="Harry Potter and the Philosopher's Stone",
-             author={'name': 'JK Rowling'},
-             chapters=[
+            ]
+        ).commit()
+        yield Book(
+            title="Harry Potter and the Philosopher's Stone",
+            author={'name': 'JK Rowling'},
+            chapters=[
                 {'name': 'The Boy Who Lived'},
                 {'name': 'The Vanishing Glass'},
                 {'name': 'The Letters from No One'},
                 {'name': 'The Keeper of the Keys'},
                 {'name': 'Diagon Alley'}
-        ]).commit()
-        yield Book(title='A Game of Thrones',
+            ]
+        ).commit()
+        yield Book(
+            title='A Game of Thrones',
             author={'name': 'George RR Martin'},
             chapters=[
                 {'name': 'Prologue'},
@@ -740,7 +749,8 @@ class TestTxMongo(BaseDBTest):
                 {'name': 'Daenerys I'},
                 {'name': 'Eddard I'},
                 {'name': 'Jon I'}
-        ]).commit()
+            ]
+        ).commit()
 
         res = yield Book.find({'title': 'The Hobbit'})
         assert len(res) == 1
@@ -781,7 +791,6 @@ class TestTxMongo(BaseDBTest):
             def post_delete(self, ret):
                 assert isinstance(ret, DeleteResult)
                 callbacks.append('post_delete')
-
 
         p = Person(name='John', age=20)
         yield p.commit()
@@ -847,7 +856,6 @@ class TestTxMongo(BaseDBTest):
 
             def pre_delete(self):
                 return {'version': self.version}
-
 
         p = Person(name='John', age=20)
         yield p.commit()

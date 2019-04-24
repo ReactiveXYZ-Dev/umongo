@@ -50,9 +50,11 @@ class TestBuilder:
         AlphaDB, AlphaDocument, AlphaBuilder = create_env('Alpha')
 
         registerer.register(AlphaBuilder)
+
         # Create a new builder compatible with AlphaDB
         class Alpha2Builder(AlphaBuilder):
             pass
+
         registerer.register(Alpha2Builder)
 
         # Last registered builder should be tested first

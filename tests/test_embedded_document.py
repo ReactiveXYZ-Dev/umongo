@@ -1,6 +1,7 @@
 from copy import copy, deepcopy
 
 import pytest
+
 from marshmallow import ValidationError, missing
 
 from umongo.data_proxy import data_proxy_factory
@@ -167,11 +168,11 @@ class TestEmbeddedDocument(BaseTest):
         assert exc.value.args[0] == {'l': {1: {'_schema': ['Invalid input type.']}}}
 
         with pytest.raises(ValidationError) as exc:
-            k = MyDoc(b=[{}])
+            MyDoc(b=[{}])
         assert exc.value.args[0] == {'b': ['Not a valid integer.']}
 
         with pytest.raises(ValidationError) as exc:
-            k = MyDoc(e=[{}])
+            MyDoc(e=[{}])
         assert exc.value.args[0] == {'e': {'_schema': ['Invalid input type.']}}
 
     def test_inheritance(self):
@@ -211,10 +212,11 @@ class TestEmbeddedDocument(BaseTest):
         assert child.to_mongo() == {'in_mongo_a_child': 1, 'b': 2, 'c': 3, '_cls': 'EmbeddedChild'}
         assert grandchild.to_mongo() == {'d': 4, '_cls': 'GrandChild'}
 
+        with pytest.raises(ValidationError) as exc:
+            MyDoc(parent=OtherEmbedded())
+        assert exc.value.args[0] == {'parent': {'_schema': ['Invalid input type.']}}
         with pytest.raises(ValidationError):
-            ret = MyDoc(parent=OtherEmbedded())
-        with pytest.raises(ValidationError):
-            ret = MyDoc(child=parent)
+            MyDoc(child=parent)
         doc = MyDoc(parent=child, child=child)
         assert doc.child == doc.parent
 
@@ -375,7 +377,7 @@ class TestEmbeddedDocument(BaseTest):
         assert emb_1 != emb_4
         assert emb_1 != None  # noqa: E711 (None comparison)
         assert emb_1 != missing
-        assert None != emb_1
+        assert None != emb_1  # noqa: E711 (None comparison)
         assert missing != emb_1
 
     def test_strict_embedded_document(self):

@@ -1,6 +1,8 @@
 import asyncio
+
 from motor.motor_asyncio import AsyncIOMotorDatabase, AsyncIOMotorCursor
 from pymongo.errors import DuplicateKeyError
+from inspect import iscoroutine
 
 from ..builder import BaseBuilder
 from ..document import DocumentImplementation
@@ -65,32 +67,43 @@ class MotorAsyncIODocument(DocumentImplementation):
     # Cook hooks into coroutines in order to allow them to return
     # either Future or regular return value.
 
-    @asyncio.coroutine
-    def __coroutined_pre_insert(self):
-        return self.pre_insert()
+    async def __coroutined_pre_insert(self):
+        ret = self.pre_insert()
+        if iscoroutine(ret):
+            ret = await ret
+        return ret
 
-    @asyncio.coroutine
-    def __coroutined_pre_update(self):
-        return self.pre_update()
+    async def __coroutined_pre_update(self):
+        ret = self.pre_update()
+        if iscoroutine(ret):
+            ret = await ret
+        return ret
 
-    @asyncio.coroutine
-    def __coroutined_pre_delete(self):
-        return self.pre_delete()
+    async def __coroutined_pre_delete(self):
+        ret = self.pre_delete()
+        if iscoroutine(ret):
+            ret = await ret
+        return ret
 
-    @asyncio.coroutine
-    def __coroutined_post_insert(self, ret):
-        return self.post_insert(ret)
+    async def __coroutined_post_insert(self, ret):
+        ret = self.post_insert(ret)
+        if iscoroutine(ret):
+            ret = await ret
+        return ret
 
-    @asyncio.coroutine
-    def __coroutined_post_update(self, ret):
-        return self.post_update(ret)
+    async def __coroutined_post_update(self, ret):
+        ret = self.post_update(ret)
+        if iscoroutine(ret):
+            ret = await ret
+        return ret
 
-    @asyncio.coroutine
-    def __coroutined_post_delete(self, ret):
-        return self.post_delete(ret)
+    async def __coroutined_post_delete(self, ret):
+        ret = self.post_delete(ret)
+        if iscoroutine(ret):
+            ret = await ret
+        return ret
 
-    @asyncio.coroutine
-    def reload(self):
+    async def reload(self):
         """
         Retrieve and replace document's data by the ones in database.
 
@@ -99,14 +112,13 @@ class MotorAsyncIODocument(DocumentImplementation):
         """
         if not self.is_created:
             raise NotCreatedError("Document doesn't exists in database")
-        ret = yield from self.collection.find_one(self.pk)
+        ret = await self.collection.find_one(self.pk)
         if ret is None:
             raise NotCreatedError("Document doesn't exists in database")
         self._data = self.DataProxy()
         self._data.from_mongo(ret)
 
-    @asyncio.coroutine
-    def commit(self, io_validate_all=False, conditions=None):
+    async def commit(self, io_validate_all=False, conditions=None):
         """
         Commit the document in database.
         If the document doesn't already exist it will be inserted, otherwise
@@ -127,30 +139,30 @@ class MotorAsyncIODocument(DocumentImplementation):
                     query['_id'] = self.pk
                     # pre_update can provide additional query filter and/or
                     # modify the fields' values
-                    additional_filter = yield from self.__coroutined_pre_update()
+                    additional_filter = await self.__coroutined_pre_update()
                     if additional_filter:
                         query.update(map_query(additional_filter, self.schema.fields))
                     self.required_validate()
-                    yield from self.io_validate(validate_all=io_validate_all)
+                    await self.io_validate(validate_all=io_validate_all)
                     payload = self._data.to_mongo(update=True)
-                    ret = yield from self.collection.update_one(query, payload)
+                    ret = await self.collection.update_one(query, payload)
                     if ret.matched_count != 1:
                         raise UpdateError(ret)
-                    yield from self.__coroutined_post_update(ret)
+                    await self.__coroutined_post_update(ret)
                 else:
                     ret = None
             elif conditions:
                 raise RuntimeError('Document must already exist in database to use `conditions`.')
             else:
-                yield from self.__coroutined_pre_insert()
+                await self.__coroutined_pre_insert()
                 self.required_validate()
-                yield from self.io_validate(validate_all=io_validate_all)
+                await self.io_validate(validate_all=io_validate_all)
                 payload = self._data.to_mongo(update=False)
-                ret = yield from self.collection.insert_one(payload)
+                ret = await self.collection.insert_one(payload)
                 # TODO: check ret ?
                 self._data.set_by_mongo_name('_id', ret.inserted_id)
                 self.is_created = True
-                yield from self.__coroutined_post_insert(ret)
+                await self.__coroutined_post_insert(ret)
         except DuplicateKeyError as exc:
             # Need to dig into error message to find faulting index
             errmsg = exc.details['errmsg']
@@ -173,15 +185,13 @@ class MotorAsyncIODocument(DocumentImplementation):
         self._data.clear_modified()
         return ret
 
-    @asyncio.coroutine
-    def delete(self, conditions=None):
+    async def delete(self, conditions=None):
         """
         Alias of :meth:`remove` to enforce default api.
         """
-        return self.remove(conditions=conditions)
+        return await self.remove(conditions=conditions)
 
-    @asyncio.coroutine
-    def remove(self, conditions=None):
+    async def remove(self, conditions=None):
         """
         Remove the document from database.
 
@@ -201,17 +211,17 @@ class MotorAsyncIODocument(DocumentImplementation):
         query = conditions or {}
         query['_id'] = self.pk
         # pre_delete can provide additional query filter
-        additional_filter = yield from self.__coroutined_pre_delete()
+        additional_filter = await self.__coroutined_pre_delete()
         if additional_filter:
             query.update(map_query(additional_filter, self.schema.fields))
-        ret = yield from self.collection.delete_one(query)
+        ret = await self.collection.delete_one(query)
         if ret.deleted_count != 1:
             raise DeleteError(ret)
         self.is_created = False
-        yield from self.__coroutined_post_delete(ret)
+        await self.__coroutined_post_delete(ret)
         return ret
 
-    def io_validate(self, validate_all=False):
+    async def io_validate(self, validate_all=False):
         """
         Run the io_validators of the document's fields.
 
@@ -219,19 +229,18 @@ class MotorAsyncIODocument(DocumentImplementation):
             fields that have been modified.
         """
         if validate_all:
-            return _io_validate_data_proxy(self.schema, self._data)
+            return await _io_validate_data_proxy(self.schema, self._data)
         else:
-            return _io_validate_data_proxy(
+            return await _io_validate_data_proxy(
                 self.schema, self._data, partial=self._data.get_modified_fields())
 
     @classmethod
-    @asyncio.coroutine
-    def find_one(cls, filter=None, *args, **kwargs):
+    async def find_one(cls, filter=None, *args, **kwargs):
         """
         Find a single document in database.
         """
         filter = cook_find_filter(cls, filter)
-        ret = yield from cls.collection.find_one(*args, filter=filter, **kwargs)
+        ret = await cls.collection.find_one(*args, filter=filter, **kwargs)
         if ret is not None:
             ret = cls.build_from_mongo(ret, use_cls=True)
         return ret
@@ -247,23 +256,21 @@ class MotorAsyncIODocument(DocumentImplementation):
         return WrappedCursor(cls, cls.collection.find(*args, filter=filter, **kwargs))
 
     @classmethod
-    @asyncio.coroutine
-    def ensure_indexes(cls):
+    async def ensure_indexes(cls):
         """
         Check&create if needed the Document's indexes in database
         """
         for index in cls.opts.indexes:
             kwargs = index.document.copy()
             keys = [(k, d) for k, d in kwargs.pop('key').items()]
-            yield from cls.collection.create_index(keys, **kwargs)
+            await cls.collection.create_index(keys, **kwargs)
 
 
 # Run multiple validators and collect all errors in one
-@asyncio.coroutine
-def _run_validators(validators, field, value):
+async def _run_validators(validators, field, value):
     errors = []
     tasks = [validator(field, value) for validator in validators]
-    results = yield from asyncio.gather(*tasks, return_exceptions=True)
+    results = await asyncio.gather(*tasks, return_exceptions=True)
     for i, res in enumerate(results):
         if isinstance(res, ValidationError):
             errors.extend(res.messages)
@@ -273,7 +280,7 @@ def _run_validators(validators, field, value):
         raise ValidationError(errors)
 
 
-def _io_validate_data_proxy(schema, data_proxy, partial=None):
+async def _io_validate_data_proxy(schema, data_proxy, partial=None):
     errors = {}
     tasks = []
     tasks_field_name = []
@@ -286,13 +293,13 @@ def _io_validate_data_proxy(schema, data_proxy, partial=None):
             continue
         try:
             if field.io_validate_recursive:
-                yield from field.io_validate_recursive(field, value)
+                await field.io_validate_recursive(field, value)
             if field.io_validate:
                 tasks.append(_run_validators(field.io_validate, field, value))
                 tasks_field_name.append(name)
         except ValidationError as ve:
             errors[name] = ve.messages
-    results = yield from asyncio.gather(*tasks, return_exceptions=True)
+    results = await asyncio.gather(*tasks, return_exceptions=True)
     for i, res in enumerate(results):
         if isinstance(res, ValidationError):
             errors[tasks_field_name[i]] = res.messages
@@ -302,18 +309,16 @@ def _io_validate_data_proxy(schema, data_proxy, partial=None):
         raise ValidationError(errors)
 
 
-@asyncio.coroutine
-def _reference_io_validate(field, value):
-    yield from value.fetch(no_data=True)
+async def _reference_io_validate(field, value):
+    await value.fetch(no_data=True)
 
 
-@asyncio.coroutine
-def _list_io_validate(field, value):
+async def _list_io_validate(field, value):
     validators = field.container.io_validate
     if not validators or not value:
         return
     tasks = [_run_validators(validators, field.container, e) for e in value]
-    results = yield from asyncio.gather(*tasks, return_exceptions=True)
+    results = await asyncio.gather(*tasks, return_exceptions=True)
     errors = {}
     for i, res in enumerate(results):
         if isinstance(res, ValidationError):
@@ -324,9 +329,8 @@ def _list_io_validate(field, value):
         raise ValidationError(errors)
 
 
-@asyncio.coroutine
-def _embedded_document_io_validate(field, value):
-    yield from _io_validate_data_proxy(value.schema, value._data)
+async def _embedded_document_io_validate(field, value):
+    await _io_validate_data_proxy(value.schema, value._data)
 
 
 class MotorAsyncIOReference(Reference):
@@ -344,12 +348,11 @@ class MotorAsyncIOReference(Reference):
     def document(self):
         return self._document
 
-    @asyncio.coroutine
-    def fetch(self, no_data=False, force_reload=False):
+    async def fetch(self, no_data=False, force_reload=False):
         if not self._document or force_reload:
             if self.pk is None:
                 raise ReferenceError('Cannot retrieve a None Reference')
-            self._document = yield from self.document_cls.find_one(self.pk)
+            self._document = await self.document_cls.find_one(self.pk)
             if not self._document:
                 raise ValidationError(self.error_messages['not_found'].format(
                     document=self.document_cls.__name__))

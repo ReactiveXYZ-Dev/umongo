@@ -141,11 +141,8 @@ class BaseDataProxy:
         return name, field
 
     def get(self, name, to_raise=KeyError):
-        name, field = self._get_field(name, to_raise)
-        value = self._data[name]
-        if value is missing and field.default is not missing:
-            return field.default
-        return value
+        name, _ = self._get_field(name, to_raise)
+        return self._data[name]
 
     def set(self, name, value, to_raise=KeyError):
         name, field = self._get_field(name, to_raise)
@@ -158,8 +155,9 @@ class BaseDataProxy:
         self._mark_as_modified(name)
 
     def delete(self, name, to_raise=KeyError):
-        name, _ = self._get_field(name, to_raise)
-        self._data[name] = missing
+        name, field = self._get_field(name, to_raise)
+        default = field.default
+        self._data[name] = default() if callable(default) else default
         self._mark_as_modified(name)
 
     def __repr__(self):

@@ -1,6 +1,8 @@
-import pytest
-from bson import ObjectId
 import importlib
+
+import pytest
+
+from bson import ObjectId
 
 from umongo import (Document, fields, AlreadyRegisteredDocumentError, EmbeddedDocument,
                     NotRegisteredDocumentError, NoDBDefinedError)
@@ -197,7 +199,7 @@ class TestInstance:
             pass
 
         ToRef1 = instance1.register(ToRef)
-        ToRef2 = instance2.register(ToRef)
+        instance2.register(ToRef)
 
         class Doc(Document):
             embedded = fields.EmbeddedField(Embedded1)
@@ -207,10 +209,14 @@ class TestInstance:
         Doc2 = instance2.register(Doc)
 
         assert issubclass(Doc.embedded.embedded_document, EmbeddedDocumentTemplate)
-        assert issubclass(Doc1.schema.fields['embedded'].embedded_document, EmbeddedDocumentTemplate)
-        assert issubclass(Doc2.schema.fields['embedded'].embedded_document, EmbeddedDocumentTemplate)
-        assert issubclass(Doc1.schema.fields['embedded'].embedded_document_cls, EmbeddedDocumentImplementation)
-        assert issubclass(Doc2.schema.fields['embedded'].embedded_document_cls, EmbeddedDocumentImplementation)
+        assert issubclass(
+            Doc1.schema.fields['embedded'].embedded_document, EmbeddedDocumentTemplate)
+        assert issubclass(
+            Doc2.schema.fields['embedded'].embedded_document, EmbeddedDocumentTemplate)
+        assert issubclass(
+            Doc1.schema.fields['embedded'].embedded_document_cls, EmbeddedDocumentImplementation)
+        assert issubclass(
+            Doc2.schema.fields['embedded'].embedded_document_cls, EmbeddedDocumentImplementation)
 
         assert issubclass(Doc.ref.document, DocumentTemplate)
         assert issubclass(Doc1.schema.fields['ref'].document, DocumentTemplate)

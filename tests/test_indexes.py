@@ -1,10 +1,11 @@
-import pytest
 from itertools import zip_longest
 
+import pytest
+
+from umongo import Document, EmbeddedDocument, fields
 from umongo.indexes import (
     explicit_key, parse_index,
     IndexModel, ASCENDING, DESCENDING, TEXT, HASHED)
-from umongo import Document, EmbeddedDocument, fields
 
 from .common import BaseTest
 
